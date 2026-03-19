@@ -14,6 +14,7 @@ interface Task {
   status: "todo" | "in-progress" | "done";
   priority: "low" | "medium" | "high";
   createdAt: string;
+  dueDate?: string;
 }
 
 // In-memory task store
@@ -125,6 +126,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               enum: ["low", "medium", "high"],
               description: "Task priority",
             },
+            dueDate: {
+              type: "string",
+              description: "Optional due date (ISO 8601, e.g. 2026-04-01)",
+            },
           },
           required: ["title", "description"],
         },
@@ -184,6 +189,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         status: "todo",
         priority: (args.priority as Task["priority"]) || "medium",
         createdAt: new Date().toISOString(),
+        dueDate: args.dueDate ? (args.dueDate as string) : undefined,
       };
       tasks.set(id, newTask);
       return {
