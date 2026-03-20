@@ -17,6 +17,9 @@ interface Task {
   dueDate?: string;
 }
 
+const VALID_STATUSES: Task["status"][] = ["todo", "in-progress", "done"];
+const VALID_PRIORITIES: Task["priority"][] = ["low", "medium", "high"];
+
 // In-memory task store
 const tasks: Map<string, Task> = new Map();
 
@@ -135,6 +138,33 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: "update_task",
+        description: "Update one or more fields of an existing task",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Task ID to update" },
+            title: { type: "string", description: "New task title" },
+            description: { type: "string", description: "New task description" },
+            status: {
+              type: "string",
+              enum: ["todo", "in-progress", "done"],
+              description: "New task status",
+            },
+            priority: {
+              type: "string",
+              enum: ["low", "medium", "high"],
+              description: "New task priority",
+            },
+            dueDate: {
+              type: ["string", "null"],
+              description: "New due date (ISO 8601) or null to clear",
+            },
+          },
+          required: ["id"],
+        },
+      },
+      {
         name: "update_task_status",
         description: "Update the status of a task",
         inputSchema: {
@@ -181,6 +211,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   switch (name) {
     case "create_task": {
+      if (!(args.title as string).trim()) {
+        return {
+          content: [{ type: "text", text: "Title cannot be empty" }],
+          isError: true,
+        };
+      }
+      if (!(args.description as string).trim()) {
+        return {
+          content: [{ type: "text", text: "Description cannot be empty" }],
+          isError: true,
+        };
+      }
+
       const id = String(tasks.size + 1);
       const newTask: Task = {
         id,
@@ -202,11 +245,77 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
     }
 
-    case "update_task_status": {
-      const task = tasks.get(args.id as string);
+    case "update_task": {
+      const updateFields = ["title", "description", "status", "priority", "dueDate"] as const;
+      if (!updateFields.some((f) => f in args)) {
+        return {
+          content: [{ type: "text", text: "No fields to update. Provide at least one of: title, description, status, priority, dueDate" }],
+          isError: true,
+        };
+      }
+
+      const id = String(args.id);
+      const task = tasks.get(id);
       if (!task) {
         return {
-          content: [{ type: "text", text: `Task ${args.id} not found` }],
+          content: [{ type: "text", text: `Task ${id} not found` }],
+          isError: true,
+        };
+      }
+
+      if ("status" in args && !VALID_STATUSES.includes(args.status as Task["status"])) {
+        return {
+          content: [{ type: "text", text: `Invalid status: ${args.status}. Must be one of: ${VALID_STATUSES.join(", ")}` }],
+          isError: true,
+        };
+      }
+
+      if ("priority" in args && !VALID_PRIORITIES.includes(args.priority as Task["priority"])) {
+        return {
+          content: [{ type: "text", text: `Invalid priority: ${args.priority}. Must be one of: ${VALID_PRIORITIES.join(", ")}` }],
+          isError: true,
+        };
+      }
+
+      if ("title" in args && !(args.title as string).trim()) {
+        return {
+          content: [{ type: "text", text: "Title cannot be empty" }],
+          isError: true,
+        };
+      }
+
+      if ("description" in args && !(args.description as string).trim()) {
+        return {
+          content: [{ type: "text", text: "Description cannot be empty" }],
+          isError: true,
+        };
+      }
+
+      if ("title" in args) task.title = args.title as string;
+      if ("description" in args) task.description = args.description as string;
+      if ("status" in args) task.status = args.status as Task["status"];
+      if ("priority" in args) task.priority = args.priority as Task["priority"];
+
+      if ("dueDate" in args) {
+        task.dueDate = args.dueDate === null ? undefined : (args.dueDate as string);
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Updated task ${id}: ${task.title}`,
+          },
+        ],
+      };
+    }
+
+    case "update_task_status": {
+      const id = String(args.id);
+      const task = tasks.get(id);
+      if (!task) {
+        return {
+          content: [{ type: "text", text: `Task ${id} not found` }],
           isError: true,
         };
       }
@@ -215,17 +324,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         content: [
           {
             type: "text",
-            text: `Updated task ${args.id} status to ${args.status}`,
+            text: `Updated task ${id} status to ${args.status}`,
           },
         ],
       };
     }
 
     case "get_task": {
-      const task = tasks.get(args.id as string);
+      const id = String(args.id);
+      const task = tasks.get(id);
       if (!task) {
         return {
-          content: [{ type: "text", text: `Task ${args.id} not found` }],
+          content: [{ type: "text", text: `Task ${id} not found` }],
           isError: true,
         };
       }
@@ -240,15 +350,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     case "delete_task": {
-      if (!tasks.has(args.id as string)) {
+      const id = String(args.id);
+      if (!tasks.has(id)) {
         return {
-          content: [{ type: "text", text: `Task ${args.id} not found` }],
+          content: [{ type: "text", text: `Task ${id} not found` }],
           isError: true,
         };
       }
-      tasks.delete(args.id as string);
+      tasks.delete(id);
       return {
-        content: [{ type: "text", text: `Deleted task ${args.id}` }],
+        content: [{ type: "text", text: `Deleted task ${id}` }],
       };
     }
 
