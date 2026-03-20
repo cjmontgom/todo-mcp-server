@@ -707,3 +707,24 @@ So that I can explore task data naturally and learn how AI agents maintain conte
 **Given** all previous Epic 4 panels (Resources, Tools, Prompts) are active
 **When** the user interacts with the chat panel
 **Then** the chat panel coexists with the manual panels; results from either can be viewed without interference; the user can switch freely between manual MCP interaction and AI-mediated interaction
+
+---
+
+### Stretch Goal Note (added 2026-03-20)
+
+**Consider using MCP Sampling instead of (or alongside) a custom `/llm/interpret` proxy endpoint.**
+
+Currently Epic 5 adds an HTTP endpoint on the proxy that calls an LLM directly. MCP's **sampling** primitive offers an alternative architecture: rather than the proxy calling the LLM itself, the MCP server sends a `sampling/createMessage` request back to the client, and the client (the React app) handles the LLM call. This inverts the usual server→client direction.
+
+Potential benefits for this project's educational goals:
+- Demonstrates the full MCP protocol including its less-known server→client direction
+- The React app (MCP client) becomes the LLM provider, which may simplify proxy complexity
+- Educational copy can explain sampling as a first-class MCP concept alongside Resources, Tools, and Prompts
+- Keeps LLM provider configuration in the client rather than the proxy
+
+Trade-offs to evaluate during story creation:
+- Sampling support requires the client to declare `sampling` capability during `initialize` — adds complexity to the React MCP client
+- The MCP SDK sampling API may be less mature than a straightforward fetch-based proxy call
+- May be better suited as an optional "advanced mode" toggle rather than the default implementation
+
+**Recommendation:** Evaluate during Story 5.1 planning whether to use sampling natively, keep the proxy approach, or support both as a teaching comparison.
