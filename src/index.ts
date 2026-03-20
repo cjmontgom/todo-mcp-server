@@ -17,6 +17,7 @@ interface Task {
   priority: "low" | "medium" | "high";
   createdAt: string;
   dueDate?: string;
+  completedAt?: string;
 }
 
 const VALID_STATUSES: Task["status"][] = ["todo", "in-progress", "done"];
@@ -394,7 +395,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       if ("title" in args) task.title = args.title as string;
       if ("description" in args) task.description = args.description as string;
-      if ("status" in args) task.status = args.status as Task["status"];
+      if ("status" in args) {
+        task.status = args.status as Task["status"];
+        if (task.status === "done" && !task.completedAt) {
+          task.completedAt = new Date().toISOString();
+        } else if (task.status !== "done") {
+          task.completedAt = undefined;
+        }
+      }
       if ("priority" in args) task.priority = args.priority as Task["priority"];
 
       if ("dueDate" in args) {
@@ -421,6 +429,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
       task.status = args.status as Task["status"];
+      if (task.status === "done" && !task.completedAt) {
+        task.completedAt = new Date().toISOString();
+      } else if (task.status !== "done") {
+        task.completedAt = undefined;
+      }
       return {
         content: [
           {
@@ -484,6 +497,26 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
           },
         ],
       },
+      {
+        name: "tasks_summary_for_stakeholders",
+        description: "Summary of task counts by status, overdue count, and overdue task details",
+      },
+      {
+        name: "completions_by_date",
+        description: "Completed tasks grouped by completion date, with optional date range filter",
+        arguments: [
+          {
+            name: "from",
+            description: "Start date for filtering (ISO 8601, e.g. 2026-03-01). Optional.",
+            required: false,
+          },
+          {
+            name: "to",
+            description: "End date for filtering (ISO 8601, e.g. 2026-03-31). Optional.",
+            required: false,
+          },
+        ],
+      },
     ],
   };
 });
@@ -491,53 +524,114 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
 server.setRequestHandler(GetPromptRequestSchema, async (request) => {
   const { name, arguments: promptArgs = {} } = request.params;
 
-  if (name !== "tasks_table") {
-    throw new Error(`Prompt not found: ${name}`);
+  if (name === "tasks_table") {
+    const sort = promptArgs["sort"];
+    const allTasks = Array.from(tasks.values());
+    let sorted: Task[];
+
+    if (sort === "deadline") {
+      sorted = [...allTasks].sort((a, b) => {
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return a.dueDate.localeCompare(b.dueDate);
+      });
+    } else if (sort === "priority") {
+      sorted = [...allTasks].sort((a, b) => {
+        const pDiff = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+        if (pDiff !== 0) return pDiff;
+        return a.id.localeCompare(b.id);
+      });
+    } else if (sort === "priority-then-deadline") {
+      sorted = [...allTasks].sort((a, b) => {
+        const pDiff = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+        if (pDiff !== 0) return pDiff;
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return a.dueDate.localeCompare(b.dueDate);
+      });
+    } else {
+      throw new Error(
+        `Invalid sort value: "${sort}". Must be one of: deadline, priority, priority-then-deadline`
+      );
+    }
+
+    return {
+      messages: [{ role: "user", content: { type: "text", text: markdownTable(sorted) } }],
+    };
   }
 
-  const sort = promptArgs["sort"];
-  const allTasks = Array.from(tasks.values());
-  let sorted: Task[];
+  if (name === "tasks_summary_for_stakeholders") {
+    const allTasks = Array.from(tasks.values());
+    const todoCount = allTasks.filter((t) => t.status === "todo").length;
+    const inProgressCount = allTasks.filter((t) => t.status === "in-progress").length;
+    const doneCount = allTasks.filter((t) => t.status === "done").length;
 
-  if (sort === "deadline") {
-    sorted = [...allTasks].sort((a, b) => {
-      if (!a.dueDate && !b.dueDate) return 0;
-      if (!a.dueDate) return 1;
-      if (!b.dueDate) return -1;
-      return a.dueDate.localeCompare(b.dueDate);
-    });
-  } else if (sort === "priority") {
-    sorted = [...allTasks].sort((a, b) => {
-      const pDiff = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
-      if (pDiff !== 0) return pDiff;
-      return a.id.localeCompare(b.id);
-    });
-  } else if (sort === "priority-then-deadline") {
-    sorted = [...allTasks].sort((a, b) => {
-      const pDiff = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
-      if (pDiff !== 0) return pDiff;
-      if (!a.dueDate && !b.dueDate) return 0;
-      if (!a.dueDate) return 1;
-      if (!b.dueDate) return -1;
-      return a.dueDate.localeCompare(b.dueDate);
-    });
-  } else {
-    throw new Error(
-      `Invalid sort value: "${sort}". Must be one of: deadline, priority, priority-then-deadline`
+    const today = new Date().toISOString().slice(0, 10);
+    const overdueTasks = allTasks.filter(
+      (t) => t.dueDate && t.dueDate.slice(0, 10) < today && t.status !== "done"
     );
+
+    let summary = `# Task Summary for Stakeholders\n\n`;
+    summary += `| Status | Count |\n| --- | --- |\n`;
+    summary += `| Todo | ${todoCount} |\n`;
+    summary += `| In Progress | ${inProgressCount} |\n`;
+    summary += `| Done | ${doneCount} |\n`;
+    summary += `| **Total** | **${allTasks.length}** |\n\n`;
+    summary += `**Overdue tasks:** ${overdueTasks.length}\n`;
+
+    if (overdueTasks.length > 0) {
+      summary += `\n## Overdue Tasks\n\n`;
+      summary += markdownTable(overdueTasks);
+    }
+
+    return {
+      messages: [{ role: "user", content: { type: "text", text: summary } }],
+    };
   }
 
-  return {
-    messages: [
-      {
-        role: "user",
-        content: {
-          type: "text",
-          text: markdownTable(sorted),
-        },
-      },
-    ],
-  };
+  if (name === "completions_by_date") {
+    const from = promptArgs["from"];
+    const to = promptArgs["to"];
+
+    let completed = Array.from(tasks.values()).filter(
+      (t) => t.status === "done" && t.completedAt
+    );
+
+    if (from) {
+      completed = completed.filter((t) => t.completedAt!.slice(0, 10) >= from);
+    }
+    if (to) {
+      completed = completed.filter((t) => t.completedAt!.slice(0, 10) <= to);
+    }
+
+    if (completed.length === 0) {
+      return {
+        messages: [
+          { role: "user", content: { type: "text", text: "No completed tasks found." } },
+        ],
+      };
+    }
+
+    const groups: Record<string, number> = {};
+    for (const t of completed) {
+      const dateKey = t.completedAt!.slice(0, 10);
+      groups[dateKey] = (groups[dateKey] || 0) + 1;
+    }
+
+    const sortedDates = Object.keys(groups).sort();
+    let table = "| Date | Completed |\n| --- | --- |\n";
+    for (const date of sortedDates) {
+      table += `| ${date} | ${groups[date]} |\n`;
+    }
+
+    return {
+      messages: [{ role: "user", content: { type: "text", text: table } }],
+    };
+  }
+
+  throw new Error(`Prompt not found: ${name}`);
 });
 
 // Start the server
