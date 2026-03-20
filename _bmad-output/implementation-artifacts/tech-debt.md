@@ -120,6 +120,36 @@ Items surfaced during code reviews that are real but not caused by the change un
 - **Detail:** `parseMarkdownTable` accepts any pipe table and zips cells against the task `HEADER_MAP`. A resource with different column names produces rows of empty strings with no warning. The grid renders but shows no data, which appears identical to a legitimately empty resource. Safe for the current server; would silently mislead if the client is generalised to arbitrary MCP servers.
 - **Location:** `client/src/lib/parseMarkdownTable.ts` — `parseMarkdownTable`
 
+### TD-21: All form values submitted as strings — non-string schema types unsupported
+- **Surfaced in:** Story 4.3 code review (2026-03-20)
+- **Risk:** Low (current tool schemas are all `type: "string"`)
+- **Detail:** `handleSubmit` in `ToolsPanel.tsx` always sets `args[name] = value.trim()`, producing a string regardless of the field's JSON Schema `type`. The current `create_task` and `update_task` schemas are entirely string-typed, so no breakage occurs today. Any future tool with `integer`, `number`, or `boolean` parameters will receive incorrectly typed arguments, causing server validation failures without a client-side indicator.
+- **Location:** `client/src/components/ToolsPanel.tsx` — `handleSubmit`
+
+### TD-22: No AbortController / unmount cleanup for in-flight `callTool`
+- **Surfaced in:** Story 4.3 code review (2026-03-20)
+- **Risk:** Low (React 18 suppresses the warning)
+- **Detail:** `handleSubmit` awaits `callTool(...)` with no cancellation mechanism. If the `ToolsPanel` unmounts while a request is in-flight (e.g. user navigates away), the resolved promise will call `setCallState` on an unmounted component. The same pattern exists for `McpProvider` (TD-11); address together when the client gains reconnect or abort-controller logic.
+- **Location:** `client/src/components/ToolsPanel.tsx` — `handleSubmit`
+
+### TD-23: No `aria-pressed` or `aria-current` on selected tool cards
+- **Surfaced in:** Story 4.3 code review (2026-03-20)
+- **Risk:** Low
+- **Detail:** Tool cards use `role="button"` with keyboard handling but omit `aria-pressed` (or `aria-current`). Screen reader users receive no indication of which tool is currently selected. The same pattern was carried forward from how `ResourcesPanel` handles selection; a consistent fix should be applied across all three panels together in a future accessibility pass.
+- **Location:** `client/src/components/ToolsPanel.tsx` — item-card rendering
+
+### TD-24: `MUTATING_TOOLS` set hardcoded in client, duplicating server knowledge
+- **Surfaced in:** Story 4.3 code review (2026-03-20)
+- **Risk:** Low
+- **Detail:** `const MUTATING_TOOLS = new Set(["create_task", "update_task"])` in `ToolsPanel.tsx` encodes server-side semantics in the client. If a tool is renamed, a new mutating tool is added, or a read-only tool is misidentified, the "server state changed" note and refresh hint will silently show or not show incorrectly. Address by either deriving mutability from a server-provided annotation or moving detection to a shared config.
+- **Location:** `client/src/components/ToolsPanel.tsx` — `MUTATING_TOOLS`
+
+### TD-25: Non-text MCP content types silently dropped in tool result display
+- **Surfaced in:** Story 4.3 code review (2026-03-20)
+- **Risk:** Low (current tools only return `type: "text"` content)
+- **Detail:** The success handler in `handleSubmit` filters `result.content` to `c.type === "text"` only. Content items of other MCP types (images, embedded resources, etc.) are discarded with no warning to the user. Safe for the current server; would silently omit data if the client is pointed at a server that returns richer content types.
+- **Location:** `client/src/components/ToolsPanel.tsx` — `handleSubmit` (success path)
+
 ## Resolved
 
 (none yet)
