@@ -1,0 +1,20 @@
+.app-header {
+  padding: 24px 32px;
+  border-bottom: 1px solid var(--border);
+}
+
+.app-header h1 {
+  font-size: 28px;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.app-header p {
+  margin-top: 4px;
+  font-size: 15px;
+}
+
+.panels {
+  display: flex;
+  flex-direction: column;
+}

@@ -1,0 +1,108 @@
+const _proxyUrl = import.meta.env.VITE_MCP_PROXY_URL;
+if (!_proxyUrl) {
+  throw new Error(
+    "[MCP] VITE_MCP_PROXY_URL is not set. Add it to client/.env:\n  VITE_MCP_PROXY_URL=http://localhost:3001"
+  );
+}
+const BASE_URL: string = _proxyUrl;
+
+let requestId = 0;
+let initPromise: Promise<void> | null = null;
+
+export interface Resource {
+  uri: string;
+  name: string;
+  mimeType: string;
+  description?: string;
+}
+
+export interface Tool {
+  name: string;
+  description: string;
+  inputSchema: {
+    type: string;
+    properties: Record<string, { type: string; description?: string; enum?: string[] }>;
+    required?: string[];
+  };
+}
+
+export interface Prompt {
+  name: string;
+  description: string;
+  arguments?: Array<{ name: string; description?: string; required?: boolean }>;
+}
+
+interface JsonRpcResponse {
+  jsonrpc: "2.0";
+  id: number;
+  result?: unknown;
+  error?: { code: number; message: string };
+}
+
+async function sendJsonRpc(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+  const id = ++requestId;
+
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}/mcp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+    });
+  } catch {
+    throw new Error(`Proxy unreachable at ${BASE_URL}. Is it running?`);
+  }
+
+  let data: JsonRpcResponse;
+  try {
+    data = (await response.json()) as JsonRpcResponse;
+  } catch {
+    throw new Error(`Proxy returned non-JSON response (HTTP ${response.status})`);
+  }
+
+  if (data.error) {
+    throw new Error(data.error.message ?? `MCP error code ${data.error.code}`);
+  }
+
+  if (!response.ok) {
+    throw new Error(`Proxy returned HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  return data.result;
+}
+
+async function ensureInitialized(): Promise<void> {
+  initPromise ??= sendJsonRpc("initialize", {
+    protocolVersion: "2024-11-05",
+    capabilities: {},
+    clientInfo: { name: "mcp-learner", version: "1.0.0" },
+  }).then(() => undefined);
+  return initPromise;
+}
+
+export async function listResources(): Promise<Resource[]> {
+  await ensureInitialized();
+  const result = await sendJsonRpc("resources/list");
+  if (!result || !Array.isArray((result as Record<string, unknown>).resources)) {
+    throw new Error("Unexpected response shape from resources/list");
+  }
+  return (result as { resources: Resource[] }).resources;
+}
+
+export async function listTools(): Promise<Tool[]> {
+  await ensureInitialized();
+  const result = await sendJsonRpc("tools/list");
+  if (!result || !Array.isArray((result as Record<string, unknown>).tools)) {
+    throw new Error("Unexpected response shape from tools/list");
+  }
+  return (result as { tools: Tool[] }).tools;
+}
+
+export async function listPrompts(): Promise<Prompt[]> {
+  await ensureInitialized();
+  const result = await sendJsonRpc("prompts/list");
+  if (!result || !Array.isArray((result as Record<string, unknown>).prompts)) {
+    throw new Error("Unexpected response shape from prompts/list");
+  }
+  return (result as { prompts: Prompt[] }).prompts;
+}

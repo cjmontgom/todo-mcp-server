@@ -54,6 +54,36 @@ Items surfaced during code reviews that are real but not caused by the change un
 - **Detail:** `this.process.stdin.write()` return value is not checked. If the pipe buffer is full, data could be lost silently. Unlikely with small JSON-RPC messages, and write failures would trigger exit/error handlers.
 - **Location:** `proxy/src/spawnMcpServer.ts:90`
 
+### TD-10: No JSON-RPC `id` correlation on responses
+- **Surfaced in:** Story 4.1 code review (2026-03-20)
+- **Risk:** Low (MVP — single session, bounded parallelism)
+- **Detail:** `sendJsonRpc` in `client/src/mcp/client.ts` increments a request `id` but never checks whether the received `data.id` matches. With concurrent in-flight calls (e.g. three parallel list requests), a mis-paired response would silently return wrong data. Acceptable for the current single-session MVP; revisit as Stories 4.2+ add more concurrent calls.
+- **Location:** `client/src/mcp/client.ts` — `sendJsonRpc`
+
+### TD-11: `setState` after unmount in `McpProvider`
+- **Surfaced in:** Story 4.1 code review (2026-03-20)
+- **Risk:** Low (React 18 suppresses the warning)
+- **Detail:** The `useEffect` in `McpProvider` fires three async fetches with no cleanup/cancellation. If the component unmounts before any fetch resolves, the resulting `setState` calls run on an unmounted component. React 18 suppresses the console warning but the pattern is still incorrect. Address when the client gains reconnect or abort-controller logic.
+- **Location:** `client/src/context/McpContext.tsx` — `useEffect`
+
+### TD-12: Module-level `initialized` flag never resets across HMR hot reloads
+- **Surfaced in:** Story 4.1 code review (2026-03-20)
+- **Risk:** Low (dev-only nuisance)
+- **Detail:** `let initialized = false` in `client/src/mcp/client.ts` is module-level state. During Vite HMR, module-level state is often preserved, so a reload that changes the proxy URL or MCP server capabilities will not re-run the `initialize` handshake. Address when the client gains reconnect logic or a reset mechanism.
+- **Location:** `client/src/mcp/client.ts` — `initialized`, `ensureInitialized`
+
+### TD-13: `postActionList` conflates capability display name with MCP method segment
+- **Surfaced in:** Story 4.1 code review (2026-03-20)
+- **Risk:** Low (unused in Story 4.1)
+- **Detail:** `postActionList: (capability: string) => \`You listed ${capability} via ${capability.toLowerCase()}/list.\`` assumes the `capability` argument is a single lowercase word that maps directly to the MCP method path segment. Any display label with spaces or mixed casing would produce a misleading string. Address when the helper is first consumed in Story 4.5.
+- **Location:** `client/src/copy/mcpExplainer.ts` — `postActionList`
+
+### TD-14: Duplicate React `key` if server returns collisions on URI or name
+- **Surfaced in:** Story 4.1 code review (2026-03-20)
+- **Risk:** Low (current server guarantees unique URIs and tool/prompt names)
+- **Detail:** `ResourcesPanel` keys items by `r.uri`, `ToolsPanel` and `PromptsPanel` by `t.name` / `p.name`. If a future server returns duplicate identifiers, React will warn and reconciliation will be unstable. Guarded entirely by the known server's uniqueness constraints today; revisit if the client is generalised to connect to arbitrary MCP servers.
+- **Location:** `client/src/components/ResourcesPanel.tsx`, `ToolsPanel.tsx`, `PromptsPanel.tsx`
+
 ## Resolved
 
 (none yet)
