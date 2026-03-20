@@ -13,27 +13,27 @@ So that I can view task data in a structured way without building my own formatt
 1. **AC1 — `task://table/all` returns a markdown table of all tasks**
    Given the server is running with at least one task
    When a client reads `task://table/all`
-   Then the response has `mimeType: "text/markdown"` and contains a pipe-delimited table with columns ID, Title, Priority, Due, Status, with one row per task
+   Then the response has `mimeType: "text/markdown"` and contains a pipe-delimited table with columns ID, Title, Priority, Due, Status, with one row per task, sorted by `id` ascending (lexicographic)
 
 2. **AC2 — `task://table/by-deadline` sorts by dueDate ascending, nulls last**
    Given tasks exist with and without `dueDate`
    When a client reads `task://table/by-deadline`
    Then rows are sorted ascending by `dueDate`; tasks without a due date appear last
 
-3. **AC3 — `task://table/by-priority` sorts high → medium → low**
+3. **AC3 — `task://table/by-priority` sorts high → medium → low, then by `id` ascending**
    Given tasks exist with mixed priorities (high, medium, low)
    When a client reads `task://table/by-priority`
-   Then rows are ordered high → medium → low
+   Then rows are ordered high → medium → low; within the same priority, rows are sorted by `id` ascending (lexicographic) as a stable tie-breaker
 
 4. **AC4 — `task://table/priority-then-deadline` sorts by priority first, then dueDate**
    Given tasks exist with mixed priorities and due dates
    When a client reads `task://table/priority-then-deadline`
    Then rows are ordered by priority first (high → medium → low), then by `dueDate` ascending within each priority group (nulls last within each group)
 
-5. **AC5 — `task://open` returns only open tasks**
+5. **AC5 — `task://open` returns only open tasks, sorted by `id` ascending**
    Given the server is running with a mix of todo, in-progress, and done tasks
    When a client reads `task://open`
-   Then the response contains only tasks with status `todo` or `in-progress` as a markdown table
+   Then the response contains only tasks with status `todo` or `in-progress` as a markdown table, sorted by `id` ascending (lexicographic)
 
 6. **AC6 — Backward compatibility preserved**
    Given `task://all` (JSON) and `task://summary` (text) are read after adding the new resources
@@ -53,10 +53,11 @@ So that I can view task data in a structured way without building my own formatt
 **In scope:**
 - Register five new resources in `ListResourcesRequestSchema` handler
 - Implement read handlers for all five URIs in `ReadResourceRequestSchema` handler
-- Create a shared `markdownTable(tasks: Task[]): string` helper function
-- Priority sort order: high → medium → low
+- Create a shared `markdownTable(tasks: Task[]): string` helper function with a cell-escaping helper (`escMdCell`) that replaces `|` with `\|` and newlines with a space
+- Priority sort order: high → medium → low; ties broken by `id` ascending (lexicographic)
 - dueDate sort: ascending, nulls last
-- `task://open` filter: status `todo` or `in-progress`
+- `task://table/all` sort: `id` ascending (lexicographic)
+- `task://open` filter: status `todo` or `in-progress`; sort: `id` ascending (lexicographic)
 
 **Out of scope:**
 - Prompts capability — Epic 2
@@ -274,6 +275,9 @@ Add all five `if` blocks AFTER the existing `task://summary` block (line ~110) a
 |------|-------------|
 | **File location** | All changes in `src/index.ts` only — do NOT create new files |
 | **Column order** | ID, Title, Priority, Due, Status (5 columns, stable across all endpoints) |
+| **Cell escaping** | All cell values passed through `escMdCell`: replace `\|` → `\\|`, newlines → space |
+| **Default sort (no explicit sort)** | `task://table/all` and `task://open` sort by `id` ascending (lexicographic) |
+| **Priority tie-breaking** | Within same priority, `task://table/by-priority` breaks ties by `id` ascending |
 | **Task field naming** | camelCase: `dueDate`, `createdAt` |
 | **Date format** | ISO 8601 strings for `dueDate`; display as-is in table |
 | **mimeType** | `text/markdown` for all five new resources |
@@ -292,6 +296,8 @@ Add all five `if` blocks AFTER the existing `task://summary` block (line ~110) a
 6. **Do NOT add the new resources to existing tool handlers** — resources are read-only; tools are unchanged
 7. **Do NOT modify any existing tools** — `create_task`, `update_task`, `update_task_status`, `get_task`, `delete_task` remain untouched
 8. **Do NOT use different column sets for `task://open` vs table resources** — same markdownTable helper, same columns
+9. **Do NOT interpolate raw field values into table cells** — always pass through `escMdCell` to prevent `|` or newlines from breaking table structure
+10. **Do NOT leave `task://table/all` or `task://open` in insertion order** — sort by `id` ascending to provide deterministic output
 
 ## Tech Stack Reference
 

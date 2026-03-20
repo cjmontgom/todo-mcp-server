@@ -21,11 +21,16 @@ const VALID_STATUSES: Task["status"][] = ["todo", "in-progress", "done"];
 const VALID_PRIORITIES: Task["priority"][] = ["low", "medium", "high"];
 const PRIORITY_RANK: Record<Task["priority"], number> = { high: 0, medium: 1, low: 2 };
 
+function escMdCell(s: string): string {
+  return String(s).replace(/\|/g, "\\|").replace(/\n/g, " ");
+}
+
 function markdownTable(tasks: Task[]): string {
   const header = "| ID | Title | Priority | Due | Status |";
   const separator = "| --- | --- | --- | --- | --- |";
   const lines = tasks.map(
-    (t) => `| ${t.id} | ${t.title} | ${t.priority} | ${t.dueDate ?? ""} | ${t.status} |`
+    (t) =>
+      `| ${escMdCell(t.id)} | ${escMdCell(t.title)} | ${escMdCell(t.priority)} | ${escMdCell(t.dueDate ?? "")} | ${escMdCell(t.status)} |`
   );
   return [header, separator, ...lines].join("\n");
 }
@@ -150,7 +155,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   }
 
   if (uri === "task://table/all") {
-    const allTasks = Array.from(tasks.values());
+    const allTasks = [...tasks.values()].sort((a, b) => a.id.localeCompare(b.id));
     return {
       contents: [{ uri, mimeType: "text/markdown", text: markdownTable(allTasks) }],
     };
@@ -169,9 +174,11 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   }
 
   if (uri === "task://table/by-priority") {
-    const sorted = [...Array.from(tasks.values())].sort(
-      (a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]
-    );
+    const sorted = [...tasks.values()].sort((a, b) => {
+      const pDiff = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+      if (pDiff !== 0) return pDiff;
+      return a.id.localeCompare(b.id);
+    });
     return {
       contents: [{ uri, mimeType: "text/markdown", text: markdownTable(sorted) }],
     };
@@ -192,9 +199,9 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   }
 
   if (uri === "task://open") {
-    const openTasks = Array.from(tasks.values()).filter(
-      (t) => t.status === "todo" || t.status === "in-progress"
-    );
+    const openTasks = [...tasks.values()]
+      .filter((t) => t.status === "todo" || t.status === "in-progress")
+      .sort((a, b) => a.id.localeCompare(b.id));
     return {
       contents: [{ uri, mimeType: "text/markdown", text: markdownTable(openTasks) }],
     };
