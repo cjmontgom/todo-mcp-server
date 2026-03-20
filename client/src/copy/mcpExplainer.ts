@@ -14,4 +14,5 @@ export const MCP_COPY = {
     `You invoked the ${promptName} prompt — this content came from a Prompt.`,
   postActionList: (capability: string) =>
     `You listed ${capability} via ${capability.toLowerCase()}/list.`,
+  gridNoteResource: "This grid shows data Read from a Resource. We're using AG Grid as much as possible so you can learn it while learning MCP.",
 } as const;

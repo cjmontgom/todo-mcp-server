@@ -106,3 +106,23 @@ export async function listPrompts(): Promise<Prompt[]> {
   }
   return (result as { prompts: Prompt[] }).prompts;
 }
+
+export interface ResourceContent {
+  uri: string;
+  mimeType: string;
+  text: string;
+}
+
+export async function readResource(uri: string): Promise<ResourceContent> {
+  await ensureInitialized();
+  const result = await sendJsonRpc("resources/read", { uri });
+  const contents = (result as { contents: ResourceContent[] }).contents;
+  if (!Array.isArray(contents) || contents.length === 0) {
+    throw new Error(`Unexpected response shape from resources/read (uri: ${uri})`);
+  }
+  const item = contents[0];
+  if (typeof item.text !== 'string' || typeof item.mimeType !== 'string') {
+    throw new Error(`Malformed content item from resources/read (uri: ${uri})`);
+  }
+  return item;
+}
