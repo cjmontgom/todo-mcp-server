@@ -219,6 +219,10 @@ export function ToolsPanel() {
         </div>
       )}
 
+      {tools.status === "idle" && tools.data.length > 0 && (
+        <p className="post-action">{MCP_COPY.postActionListTools}</p>
+      )}
+
       {selectedTool !== null && (
         <form className="tool-form" onSubmit={handleSubmit} noValidate>
           {Object.entries(selectedTool.inputSchema.properties ?? {}).map(([name, schema]) => {

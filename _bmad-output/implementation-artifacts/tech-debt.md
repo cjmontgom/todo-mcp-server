@@ -72,12 +72,6 @@ Items surfaced during code reviews that are real but not caused by the change un
 - **Detail:** `let initialized = false` in `client/src/mcp/client.ts` is module-level state. During Vite HMR, module-level state is often preserved, so a reload that changes the proxy URL or MCP server capabilities will not re-run the `initialize` handshake. Address when the client gains reconnect logic or a reset mechanism.
 - **Location:** `client/src/mcp/client.ts` — `initialized`, `ensureInitialized`
 
-### TD-13: `postActionList` conflates capability display name with MCP method segment
-- **Surfaced in:** Story 4.1 code review (2026-03-20)
-- **Risk:** Low (unused in Story 4.1)
-- **Detail:** `postActionList: (capability: string) => \`You listed ${capability} via ${capability.toLowerCase()}/list.\`` assumes the `capability` argument is a single lowercase word that maps directly to the MCP method path segment. Any display label with spaces or mixed casing would produce a misleading string. Address when the helper is first consumed in Story 4.5.
-- **Location:** `client/src/copy/mcpExplainer.ts` — `postActionList`
-
 ### TD-14: Duplicate React `key` if server returns collisions on URI or name
 - **Surfaced in:** Story 4.1 code review (2026-03-20)
 - **Risk:** Low (current server guarantees unique URIs and tool/prompt names)
@@ -162,6 +156,19 @@ Items surfaced during code reviews that are real but not caused by the change un
 - **Detail:** `handleInvoke` awaits `getPrompt(...)` with no cancellation mechanism. If `PromptsPanel` unmounts while a request is in-flight, the resolved promise calls `setInvokeState` on an unmounted component. Analogous to TD-22 (ToolsPanel); address together when the client gains abort-controller logic.
 - **Location:** `client/src/components/PromptsPanel.tsx` — `handleInvoke`
 
+### TD-28: No `aria-live` on dynamic post-action `<p>` elements
+- **Surfaced in:** Story 4.5 code review (2026-03-20)
+- **Risk:** Low
+- **Detail:** The new list post-action lines added in Story 4.5 (`<p className="post-action">You listed … via …/list.</p>`) appear dynamically when list state transitions to `idle`. Without `aria-live="polite"` (or equivalent), screen readers will not announce these updates. The same gap exists on earlier dynamic elements added in Stories 4.2–4.4. Address in a dedicated accessibility pass across all three panels.
+- **Location:** `client/src/components/ResourcesPanel.tsx`, `ToolsPanel.tsx`, `PromptsPanel.tsx` — all `.post-action` paragraphs
+
+### TD-29: List post-action line not shown when list completes with zero items
+- **Surfaced in:** Story 4.5 code review (2026-03-20)
+- **Risk:** Low
+- **Detail:** All three panels gate the post-action line on `status === "idle" && data.length > 0`. A successful list call that returns an empty array shows no "You listed … via …/list." confirmation. Users receive no feedback that a list was performed and the server returned nothing. AC3 states "after every list completes" — the zero-items case falls through with no message. Address by adding an explicit empty-state line (e.g. "No Resources found." or showing the post-action line unconditionally on idle).
+- **Location:** `client/src/components/ResourcesPanel.tsx:92`, `ToolsPanel.tsx:221`, `PromptsPanel.tsx:192`
+
 ## Resolved
 
-(none yet)
+### TD-13: `postActionList` conflates capability display name with MCP method segment — **Resolved in Story 4.5 (2026-03-20)**
+Replaced the parameterized `postActionList` function with three safe string constants: `postActionListResources`, `postActionListTools`, `postActionListPrompts`. No callers existed; the broken function was removed entirely.

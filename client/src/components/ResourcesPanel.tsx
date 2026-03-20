@@ -91,6 +91,10 @@ export function ResourcesPanel() {
         </div>
       )}
 
+      {resources.status === "idle" && resources.data.length > 0 && (
+        <p className="post-action">{MCP_COPY.postActionListResources}</p>
+      )}
+
       {selectedUri && (
         <div className="read-result">
           {readState.status === 'loading' && (
@@ -103,7 +107,10 @@ export function ResourcesPanel() {
             <div className="error">{readState.error}</div>
           )}
           {readState.status === 'idle' && readState.rawText !== undefined && readState.rawText !== '' && (
-            <pre className="raw-text">{readState.rawText}</pre>
+            <>
+              <p className="post-action">{MCP_COPY.postActionRead(selectedUri!)}</p>
+              <pre className="raw-text">{readState.rawText}</pre>
+            </>
           )}
           {readState.status === 'idle' && readState.rows.length > 0 && (
             <TaskGrid

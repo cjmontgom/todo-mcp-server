@@ -191,10 +191,14 @@ export function PromptsPanel() {
         </div>
       )}
 
+      {prompts.status === "idle" && prompts.data.length > 0 && (
+        <p className="post-action">{MCP_COPY.postActionListPrompts}</p>
+      )}
+
       {selectedPrompt !== null && (
         <form className="tool-form" onSubmit={handleInvoke} noValidate>
           {(!selectedPrompt.arguments || selectedPrompt.arguments.length === 0) ? (
-            <p className="item-meta">No arguments — invoke directly.</p>
+            <p className="item-meta">{MCP_COPY.promptNoArgs}</p>
           ) : (
             selectedPrompt.arguments.map((arg) =>
               renderArgField(

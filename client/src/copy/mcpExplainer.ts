@@ -12,11 +12,13 @@ export const MCP_COPY = {
     `You called ${toolName} — this Tool executed on the server.`,
   postActionInvoke: (promptName: string) =>
     `You invoked the ${promptName} prompt — this content came from a Prompt.`,
-  postActionList: (capability: string) =>
-    `You listed ${capability} via ${capability.toLowerCase()}/list.`,
+  postActionListResources: "You listed Resources via resources/list.",
+  postActionListTools: "You listed Tools via tools/list.",
+  postActionListPrompts: "You listed Prompts via prompts/list.",
   gridNoteResource: "This grid shows data Read from a Resource. We're using AG Grid as much as possible so you can learn it while learning MCP.",
   toolMutatedNote: "You just used a Tool — the server state changed.",
   toolRefreshHint: "Re-read any Resource above to see the updated task data.",
   gridNoteTool: "This grid shows data returned by a Tool Call. Tools execute actions on the server — unlike Resources, which are read-only.",
   gridNotePrompt: "This content came from a Prompt — shown here in the grid.",
+  promptNoArgs: "No arguments — invoke directly.",
 } as const;
