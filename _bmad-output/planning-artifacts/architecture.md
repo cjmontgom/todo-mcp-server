@@ -132,12 +132,13 @@ npm install
 
 - **Protocol:** MCP over JSON-RPC. Server: STDIO only. Browser: HTTP + SSE to proxy; proxy forwards to server over STDIO.
 - **Proxy:** Single Node process; spawns MCP server; exposes HTTP endpoints + SSE for MCP messages; forwards requests/responses transparently. Exact API surface (e.g. POST for JSON-RPC, SSE for streaming) to be fixed in proxy implementation story.
-- **Error handling:** MCP error responses passed through proxy; React app surfaces errors in UI (e.g. toast or inline message). No custom rate limiting for MVP.
+- **LLM endpoint:** Proxy exposes `POST /llm/interpret` — accepts `{ message: string, history: Message[], capabilities: Capabilities }`. Proxy calls a configurable LLM via OpenAI-compatible chat API (Ollama at `http://localhost:11434` by default; swap to Anthropic/OpenAI by changing `LLM_BASE_URL` and `LLM_MODEL`). No vendor SDK — uses `fetch` against the OpenAI-compatible `/v1/chat/completions` endpoint that Ollama exposes natively. Returns `{ explanation: string, operation: { type: "resource_read" | "tool_call" | "prompt_get", params: object } }`. The proxy then executes the MCP operation and returns both the explanation and the MCP result. Env vars: `LLM_BASE_URL` (default `http://localhost:11434`), `LLM_MODEL` (default `llama3.1`). No API key required for Ollama; optional `LLM_API_KEY` for cloud providers.
+- **Error handling:** MCP error responses passed through proxy; React app surfaces errors in UI (e.g. toast or inline message). LLM errors (provider unreachable, invalid response) surfaced as user-visible messages in the chat UI. No custom rate limiting for MVP.
 
 ### Frontend Architecture
 
 - **State:** Context for MCP connection and current result; local state for forms, selected resource/tool/prompt, and UI toggles. No Redux or global store for MVP.
-- **Components:** Sections for Resources, Tools, Prompts; shared AG Grid component (or wrapper) for tabular data; forms driven by tool/prompt schemas.
+- **Components:** Sections for Resources, Tools, Prompts; shared AG Grid component (or wrapper) for tabular data; forms driven by tool/prompt schemas. Chat panel component (`ChatPanel.tsx`) with text input, conversation history, and result display area that reuses the shared AG Grid component.
 - **Routing:** Minimal (e.g. single page with sections or simple tabs). No deep routing required for MVP.
 - **Data flow:** List → user selects → Read/Call/Invoke → result (and optional refresh); tabular results rendered in AG Grid by default.
 
@@ -151,6 +152,7 @@ npm install
 1. Server: Task model + tools + markdown resources + prompts (shared table helper).
 2. Proxy: HTTP + SSE, spawn server, forward MCP JSON-RPC.
 3. React app: Vite scaffold → add AG Grid + MCP client → Context + Resources/Tools/Prompts sections + grid for tabular data + educational copy.
+4. LLM integration: Proxy LLM endpoint + React ChatPanel → natural language → MCP operations → AG Grid results.
 
 **Cross-component dependencies:**
 - Proxy depends on server STDIO contract (unchanged).
@@ -169,6 +171,7 @@ npm install
 **API / proxy naming:**
 - Proxy HTTP routes: use clear, documented paths (e.g. `POST /mcp` or `/rpc` for JSON-RPC); document in README. Prefer lowercase path segments with hyphens if multiple segments (e.g. `/mcp/message`).
 - Environment variable for React app: `VITE_MCP_PROXY_URL` (Vite convention for client-exposed config).
+- Proxy LLM env vars: `LLM_BASE_URL` (default `http://localhost:11434`), `LLM_MODEL` (default `llama3.1`), optional `LLM_API_KEY` (empty for Ollama).
 
 **Code naming (TypeScript / React):**
 - React components: **PascalCase** (`ResourcesPanel.tsx`, `TaskGrid.tsx`).
@@ -269,7 +272,8 @@ todo-mcp-server/
         │   ├── ResourcesPanel.tsx
         │   ├── ToolsPanel.tsx
         │   ├── PromptsPanel.tsx
-        │   └── TaskGrid.tsx
+        │   ├── TaskGrid.tsx
+        │   └── ChatPanel.tsx
         ├── lib/
         │   ├── taskColumns.ts   # AG Grid column defs
         │   └── parseMarkdownTable.ts
@@ -302,12 +306,16 @@ todo-mcp-server/
 | Epic 2 — Prompts | `src/index.ts` (prompts/list, prompts/get) |
 | Epic 3 — Proxy | `proxy/src/*` |
 | Epic 4 — React, AG Grid, education | `client/src/*` |
+| Epic 5 — LLM endpoint | `proxy/src/llm.ts` (or `proxy/src/llmEndpoint.ts`) |
+| Epic 5 — Chat UI | `client/src/components/ChatPanel.tsx` |
 
 **Cross-cutting:** Shared task column semantics — server markdown helper + `client/src/lib/taskColumns.ts` must stay aligned.
 
 ### Integration Points
 
 **Internal:** Client `mcp/client.ts` → proxy URL → proxy forwards → server JSON-RPC handlers.
+
+**LLM chain:** Client `ChatPanel` → `POST /llm/interpret` on proxy → proxy calls LLM (Ollama default) → LLM returns structured intent → proxy executes MCP operation → returns explanation + MCP result → client renders in AG Grid with educational note.
 
 **External:** `@modelcontextprotocol/sdk` on server; browser may use fetch + EventSource or thin MCP-aware client toward proxy.
 

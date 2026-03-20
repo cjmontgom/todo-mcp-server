@@ -95,6 +95,10 @@ UX-DR6: After mutating tools (create_task, update_task), surface success and opt
 UX-DR7: Global or contextual error presentation for MCP/proxy failures (inline or toast per architecture); avoid silent failures.
 UX-DR8: Loading and error states visible per capability section or per user-initiated MCP action.
 UX-DR9: Optional post-MVP: About MCP / glossary or diagram area (plan §5 story 4.5); defer unless pulled into MVP scope.
+UX-DR10: Chat panel with persistent text input and scrollable conversation history; user messages right-aligned, AI responses left-aligned with explanation text and optional AG Grid result below.
+UX-DR11: After the LLM executes an MCP operation, a brief educational note appears in the chat response explaining which MCP capability was used (e.g. "I read the resource task://table/by-priority to show you this data").
+UX-DR12: Loading state visible in the chat panel while the LLM is processing (typing indicator or spinner); input disabled during processing to prevent duplicate requests.
+UX-DR13: LLM or MCP errors surfaced inline in the chat conversation as error messages, not silent failures.
 ```
 
 ### FR Coverage Map
@@ -129,8 +133,12 @@ UX-DR9: Optional post-MVP: About MCP / glossary or diagram area (plan §5 story 
 | FR26 | Epic 4 | Grid educational note |
 | FR27 | Epic 4 | Consistent MCP terminology |
 | FR28 | Epic 4 | Post-action explanations |
+| FR29 | Epic 5 | Chat interface for natural language |
+| FR30 | Epic 5 | LLM endpoint on proxy (Ollama default) |
+| FR31 | Epic 5 | Execute LLM-selected MCP operation, display in grid |
+| FR32 | Epic 5 | Multi-turn conversation history |
 
-**NFR touchpoints:** NFR2 across Epics 1–3 (additive server/proxy); NFR1, NFR3, NFR4 primarily Epic 4; NFR2 also Epic 4 (no breaking desktop behavior).
+**NFR touchpoints:** NFR2 across Epics 1–3 (additive server/proxy); NFR1, NFR3, NFR4 primarily Epic 4; NFR2 also Epic 4 (no breaking desktop behavior). NFR1 also Epic 5 (educational LLM-to-MCP explanations).
 
 ## Epic List
 
@@ -177,6 +185,18 @@ UX-DR9: Optional post-MVP: About MCP / glossary or diagram area (plan §5 story 
 **Standalone:** Full MVP learning client once proxy is available.
 
 **Depends on:** Epic 3 (and functionally Epic 1 + Epic 2 for complete capability listing in the UI).
+
+---
+
+### Epic 5: Natural language MCP interaction via LLM
+
+**User outcome:** Learners type plain-language requests into a chat interface and watch an LLM interpret them, select the right MCP operation, execute it, and display the results — demonstrating how AI agents interact with MCP servers under the hood.
+
+**FRs covered:** FR29, FR30, FR31, FR32
+
+**Standalone:** Adds AI-mediated MCP interaction layer on top of the manual UI.
+
+**Depends on:** Epic 3 (proxy running), Epic 4 (React app with AG Grid and MCP client infrastructure).
 
 ---
 
@@ -612,3 +632,78 @@ So that I never have to guess what the app is doing or what MCP concept I just e
 **Given** all four stories in Epic 4 have been implemented
 **When** the app is reviewed end-to-end
 **Then** all UX-DRs 1–8 are demonstrably satisfied across the three panels and the grid experience
+
+---
+
+## Epic 5: Natural Language MCP Interaction via LLM
+
+Learners can type plain-language requests into a chat interface and watch an LLM interpret them, select the right MCP operation (resource read, tool call, or prompt invocation), execute it, and display the results — demonstrating how AI agents interact with MCP servers under the hood.
+
+**FRs covered:** FR29, FR30, FR31, FR32
+**UX-DRs covered:** UX-DR10, UX-DR11, UX-DR12, UX-DR13
+**Depends on:** Epic 3 (proxy running), Epic 4 (React app with AG Grid and MCP client infrastructure)
+**Additional:** LLM endpoint on proxy; `LLM_BASE_URL` and `LLM_MODEL` env vars; Ollama as default LLM provider (no SDK — fetch against OpenAI-compatible API); configurable for cloud providers. `ChatPanel.tsx` component; conversation state in React context or local state.
+
+---
+
+### Story 5.1: Add LLM interpretation endpoint to proxy and chat UI to React app
+
+As a learner using the React app,
+I want to type a plain-language request like "show me all high priority tasks" into a chat input,
+So that an AI interprets my request, executes the right MCP operation, and shows me the result — teaching me how AI agents use MCP.
+
+**Acceptance Criteria:**
+
+**Given** the proxy is running and Ollama is available at the configured `LLM_BASE_URL` (default `http://localhost:11434`) with `LLM_MODEL` pulled (e.g. `llama3.1`)
+**When** the React app sends a POST request to `/llm/interpret` with `{ message: "show me tasks sorted by deadline", history: [] }`
+**Then** the proxy calls the LLM API with a system prompt describing all available MCP capabilities (from `resources/list`, `tools/list`, `prompts/list`) and returns a structured response containing: the MCP operation to execute (`type`, `params`), a human-readable explanation, and the MCP operation result
+
+**Given** the React app is loaded
+**When** the user navigates to the chat panel
+**Then** a text input and conversation area are visible; the input accepts free-text entry and submits on Enter or button click
+
+**Given** the user types "show me overdue tasks sorted by priority" and submits
+**When** the proxy processes the request
+**Then** the LLM selects the appropriate MCP operation (e.g. read `task://table/by-priority` or invoke `tasks_summary_for_stakeholders`), the proxy executes it, and the chat panel displays: (1) the AI's explanation of what it did, (2) the MCP result in AG Grid if tabular, and (3) an educational note like "The AI read the resource task://table/by-priority — this is exactly how an MCP client uses Resources." (FR31, UX-DR11)
+
+**Given** the LLM request is in-flight
+**When** the user waits
+**Then** a loading indicator is visible in the chat area and the input is disabled (UX-DR12)
+
+**Given** the LLM API returns an error (provider unreachable, malformed response)
+**When** the error is received
+**Then** an error message is shown inline in the chat conversation (UX-DR13)
+
+**Given** Ollama is not running or the configured LLM provider is unreachable
+**When** the proxy starts or receives a `/llm/interpret` request
+**Then** the proxy returns a clear error; the React app shows the chat panel with a note: "LLM features require Ollama running locally. Install with `brew install ollama` and run `ollama pull llama3.1`."
+
+---
+
+### Story 5.2: Multi-turn conversation and educational integration
+
+As a learner using the chat interface,
+I want to have a back-and-forth conversation where follow-up requests build on previous context,
+So that I can explore task data naturally and learn how AI agents maintain context across MCP interactions.
+
+**Acceptance Criteria:**
+
+**Given** the user has already asked "show me all tasks" and received a result
+**When** the user types "now filter to just the high priority ones"
+**Then** the LLM receives the conversation history, understands the follow-up context, selects the appropriate MCP operation, and the chat panel shows the refined result (FR32)
+
+**Given** a conversation is in progress
+**When** the user scrolls the chat area
+**Then** the full conversation history (user messages, AI explanations, and previous results) is visible and scrollable (UX-DR10)
+
+**Given** the user asks the AI to create or update a task (e.g. "create a task called Review PR due next Friday")
+**When** the LLM identifies this as a tool call (`create_task` or `update_task`)
+**Then** the AI executes the tool, shows confirmation with the educational note "The AI called the create_task Tool — Tools change server state, unlike Resources which are read-only" (UX-DR11)
+
+**Given** the user asks a question the LLM cannot map to any MCP operation (e.g. "what's the weather?")
+**When** the LLM responds
+**Then** the AI explains that this MCP server only supports task management operations and suggests what the user can ask about
+
+**Given** all previous Epic 4 panels (Resources, Tools, Prompts) are active
+**When** the user interacts with the chat panel
+**Then** the chat panel coexists with the manual panels; results from either can be viewed without interference; the user can switch freely between manual MCP interaction and AI-mediated interaction

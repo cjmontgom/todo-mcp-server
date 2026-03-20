@@ -19,6 +19,16 @@ interface Task {
 
 const VALID_STATUSES: Task["status"][] = ["todo", "in-progress", "done"];
 const VALID_PRIORITIES: Task["priority"][] = ["low", "medium", "high"];
+const PRIORITY_RANK: Record<Task["priority"], number> = { high: 0, medium: 1, low: 2 };
+
+function markdownTable(tasks: Task[]): string {
+  const header = "| ID | Title | Priority | Due | Status |";
+  const separator = "| --- | --- | --- | --- | --- |";
+  const lines = tasks.map(
+    (t) => `| ${t.id} | ${t.title} | ${t.priority} | ${t.dueDate ?? ""} | ${t.status} |`
+  );
+  return [header, separator, ...lines].join("\n");
+}
 
 // In-memory task store
 const tasks: Map<string, Task> = new Map();
@@ -63,6 +73,36 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
         mimeType: "text/plain",
         description: "Summary of task statistics",
       },
+      {
+        uri: "task://table/all",
+        name: "All Tasks (Table)",
+        mimeType: "text/markdown",
+        description: "All tasks as a markdown table with columns ID, Title, Priority, Due, Status",
+      },
+      {
+        uri: "task://table/by-deadline",
+        name: "Tasks by Deadline",
+        mimeType: "text/markdown",
+        description: "All tasks sorted by due date (ascending, nulls last) as a markdown table",
+      },
+      {
+        uri: "task://table/by-priority",
+        name: "Tasks by Priority",
+        mimeType: "text/markdown",
+        description: "All tasks sorted by priority (high → medium → low) as a markdown table",
+      },
+      {
+        uri: "task://table/priority-then-deadline",
+        name: "Tasks by Priority then Deadline",
+        mimeType: "text/markdown",
+        description: "All tasks sorted by priority, then by due date within each priority group",
+      },
+      {
+        uri: "task://open",
+        name: "Open Tasks",
+        mimeType: "text/markdown",
+        description: "Only todo and in-progress tasks as a markdown table",
+      },
     ],
   };
 });
@@ -106,6 +146,57 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
           text: summary,
         },
       ],
+    };
+  }
+
+  if (uri === "task://table/all") {
+    const allTasks = Array.from(tasks.values());
+    return {
+      contents: [{ uri, mimeType: "text/markdown", text: markdownTable(allTasks) }],
+    };
+  }
+
+  if (uri === "task://table/by-deadline") {
+    const sorted = [...Array.from(tasks.values())].sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return a.dueDate.localeCompare(b.dueDate);
+    });
+    return {
+      contents: [{ uri, mimeType: "text/markdown", text: markdownTable(sorted) }],
+    };
+  }
+
+  if (uri === "task://table/by-priority") {
+    const sorted = [...Array.from(tasks.values())].sort(
+      (a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]
+    );
+    return {
+      contents: [{ uri, mimeType: "text/markdown", text: markdownTable(sorted) }],
+    };
+  }
+
+  if (uri === "task://table/priority-then-deadline") {
+    const sorted = [...Array.from(tasks.values())].sort((a, b) => {
+      const pDiff = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+      if (pDiff !== 0) return pDiff;
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return a.dueDate.localeCompare(b.dueDate);
+    });
+    return {
+      contents: [{ uri, mimeType: "text/markdown", text: markdownTable(sorted) }],
+    };
+  }
+
+  if (uri === "task://open") {
+    const openTasks = Array.from(tasks.values()).filter(
+      (t) => t.status === "todo" || t.status === "in-progress"
+    );
+    return {
+      contents: [{ uri, mimeType: "text/markdown", text: markdownTable(openTasks) }],
     };
   }
 

@@ -33,6 +33,7 @@ workflowType: 'prd'
 | SC4 | User can manage tasks with deadlines | User can create/update tasks with optional due date and see task data primarily in AG Grid (markdown as fallback where needed). |
 | SC6 | AG Grid is primary data presentation | Tabular data from resources, tools, and prompts is shown in AG Grid by default (parse markdown/JSON into grid); author gains practice with AG Grid patterns. |
 | SC5 | Existing clients unaffected | Claude Desktop and Cursor continue to use the MCP server via STDIO with no breaking changes. |
+| SC7 | User understands how AI agents use MCP | User can type a plain-language request, see the AI select and execute an MCP operation, and read an explanation of what capability was used and why. |
 
 ---
 
@@ -43,6 +44,7 @@ workflowType: 'prd'
 - **MCP server:** Task model with optional `dueDate`; `create_task` and `update_task`; markdown-table resources (`task://table/*`, `task://open`); prompts capability with `tasks_table`, `tasks_summary_for_stakeholders`, `completions_by_date`.
 - **Proxy:** Single process that spawns the task-manager server over STDIO and exposes HTTP/SSE (or WebSocket) to the browser; forwards MCP JSON-RPC.
 - **React app:** Connect to proxy; list and read Resources with educational copy; list and call Tools with schema-based forms; list and get Prompts with argument forms; **AG Grid as primary way to present tabular data** (resource reads, tool results, prompt results—parse markdown/JSON into grid); consistent MCP terminology and short explanations after key actions.
+- **LLM integration:** Chat interface in React app; proxy-side LLM endpoint that interprets natural language and maps to MCP operations; results in AG Grid with educational explanation of what the AI did. Ollama (local) as default LLM provider.
 
 ### Growth / Optional (Post-MVP)
 
@@ -142,6 +144,15 @@ workflowType: 'prd'
 | FR27 | MCP terms are used consistently across the app. | Copy uses Resource, Tool, Prompt, List, Read, Call, Invoke, URI, input schema, arguments consistently. |
 | FR28 | Key actions have in-app explanations. | After list/read/call/invoke, short copy explains what happened (e.g. "You read task://table/by-deadline," "You invoked the tasks_table prompt"). |
 
+### Natural language MCP interaction (LLM)
+
+| ID | Requirement | Acceptance criteria |
+|----|-------------|---------------------|
+| FR29 | The React app includes a chat interface where users type natural language requests about tasks. | A text input and conversation area are visible; user can type requests like "show me overdue tasks sorted by priority." |
+| FR30 | An LLM endpoint on the proxy accepts user text plus available MCP capability descriptions and returns a structured intent (which MCP operation to call, with what arguments, and a human-readable explanation). | Proxy exposes an endpoint (e.g. `POST /llm/interpret`); calls a configurable LLM provider (Ollama at `http://localhost:11434` by default); `LLM_BASE_URL` and `LLM_MODEL` env vars on proxy. |
+| FR31 | The app executes the LLM-selected MCP operation and displays results in AG Grid, with educational copy explaining which MCP capability was used. | After LLM interpretation, the app calls the corresponding MCP method and shows results in the grid with a note like "The AI read resource task://table/by-priority to answer your question." |
+| FR32 | The chat interface maintains conversation history within the session and supports multi-turn context. | Prior messages are visible; the LLM receives conversation context so follow-up requests like "now sort those by deadline instead" work. |
+
 ---
 
 ## Non-Functional Requirements
@@ -176,6 +187,7 @@ workflowType: 'prd'
 | Plan §2.1 (Data model, resources, prompts) | FR1–FR13 |
 | Plan §2.2 (Proxy) | FR14–FR16 |
 | Plan §2.3 (React app) | FR17–FR28 |
+| Sprint change proposal 2026-03-19 | FR29–FR32, SC7 (LLM natural language MCP interaction) |
 | Plan §3 (Non-functional) | NFR1–NFR4 |
 | Plan §5 (Epics) | Scope (MVP vs optional); stories can be derived from FRs |
 
