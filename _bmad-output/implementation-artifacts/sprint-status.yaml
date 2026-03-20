@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-18
-last_updated: 2026-03-20  # updated: Story 4.2 done
+last_updated: 2026-03-20  # updated: Story 4.3 review
 project: todo-mcp-server
 project_key: NOKEY
 tracking_system: file-system
@@ -64,7 +64,7 @@ development_status:
   epic-4: in-progress
   4-1-scaffold-react-app-and-list-resources-tools-and-prompts-with-educational-blurbs: done
   4-2-read-a-resource-and-display-tabular-results-in-ag-grid: done
-  4-3-call-a-tool-from-a-schema-driven-form-and-see-the-result: backlog
+  4-3-call-a-tool-from-a-schema-driven-form-and-see-the-result: review
   4-4-invoke-a-prompt-with-arguments-and-see-tabular-results-in-ag-grid: backlog
   4-5-consistent-mcp-terminology-post-action-copy-errors-and-loading-polish: backlog
   epic-4-retrospective: optional

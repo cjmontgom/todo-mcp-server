@@ -126,3 +126,21 @@ export async function readResource(uri: string): Promise<ResourceContent> {
   }
   return item;
 }
+
+export interface ToolCallResult {
+  content: Array<{ type: string; text?: string }>;
+  isError?: boolean;
+}
+
+export async function callTool(
+  toolName: string,
+  args: Record<string, unknown>
+): Promise<ToolCallResult> {
+  await ensureInitialized();
+  const result = await sendJsonRpc("tools/call", { name: toolName, arguments: args });
+  const typed = result as { content?: Array<{ type: string; text?: string }>; isError?: boolean };
+  if (!typed || !Array.isArray(typed.content)) {
+    throw new Error(`Unexpected response shape from tools/call (tool: ${toolName})`);
+  }
+  return { content: typed.content, isError: typed.isError };
+}

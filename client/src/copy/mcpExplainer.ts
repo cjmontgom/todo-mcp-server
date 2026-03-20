@@ -15,4 +15,7 @@ export const MCP_COPY = {
   postActionList: (capability: string) =>
     `You listed ${capability} via ${capability.toLowerCase()}/list.`,
   gridNoteResource: "This grid shows data Read from a Resource. We're using AG Grid as much as possible so you can learn it while learning MCP.",
+  toolMutatedNote: "You just used a Tool — the server state changed.",
+  toolRefreshHint: "Re-read any Resource above to see the updated task data.",
+  gridNoteTool: "This grid shows data returned by a Tool Call. Tools execute actions on the server — unlike Resources, which are read-only.",
 } as const;
