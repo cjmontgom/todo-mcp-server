@@ -150,6 +150,18 @@ Items surfaced during code reviews that are real but not caused by the change un
 - **Detail:** The success handler in `handleSubmit` filters `result.content` to `c.type === "text"` only. Content items of other MCP types (images, embedded resources, etc.) are discarded with no warning to the user. Safe for the current server; would silently omit data if the client is pointed at a server that returns richer content types.
 - **Location:** `client/src/components/ToolsPanel.tsx` — `handleSubmit` (success path)
 
+### TD-26: Non-text prompt message content silently discarded in PromptsPanel
+- **Surfaced in:** Story 4.4 code review (2026-03-20)
+- **Risk:** Low (current server only returns `type: "text"` content on prompts)
+- **Detail:** `result.messages.filter((m) => m.content.type === "text")` silently discards non-text content blocks (images, embedded resources, etc.) with no user feedback. Analogous to TD-25 (ToolsPanel). Safe for the current server; would silently omit data if the client connects to a server returning richer prompt content types.
+- **Location:** `client/src/components/PromptsPanel.tsx` — `handleInvoke` success path
+
+### TD-27: No AbortController for in-flight `getPrompt` in PromptsPanel
+- **Surfaced in:** Story 4.4 code review (2026-03-20)
+- **Risk:** Low (React 18 suppresses the warning; `submitSeqRef` guards stale state)
+- **Detail:** `handleInvoke` awaits `getPrompt(...)` with no cancellation mechanism. If `PromptsPanel` unmounts while a request is in-flight, the resolved promise calls `setInvokeState` on an unmounted component. Analogous to TD-22 (ToolsPanel); address together when the client gains abort-controller logic.
+- **Location:** `client/src/components/PromptsPanel.tsx` — `handleInvoke`
+
 ## Resolved
 
 (none yet)

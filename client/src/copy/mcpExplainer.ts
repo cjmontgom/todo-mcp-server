@@ -18,4 +18,5 @@ export const MCP_COPY = {
   toolMutatedNote: "You just used a Tool — the server state changed.",
   toolRefreshHint: "Re-read any Resource above to see the updated task data.",
   gridNoteTool: "This grid shows data returned by a Tool Call. Tools execute actions on the server — unlike Resources, which are read-only.",
+  gridNotePrompt: "This content came from a Prompt — shown here in the grid.",
 } as const;

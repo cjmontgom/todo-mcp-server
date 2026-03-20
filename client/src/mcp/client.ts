@@ -144,3 +144,25 @@ export async function callTool(
   }
   return { content: typed.content, isError: typed.isError };
 }
+
+export interface PromptMessage {
+  role: string;
+  content: { type: string; text?: string };
+}
+
+export interface PromptResult {
+  messages: PromptMessage[];
+}
+
+export async function getPrompt(
+  promptName: string,
+  args: Record<string, string>
+): Promise<PromptResult> {
+  await ensureInitialized();
+  const result = await sendJsonRpc("prompts/get", { name: promptName, arguments: args });
+  const typed = result as { messages?: PromptMessage[] };
+  if (!typed || !Array.isArray(typed.messages)) {
+    throw new Error(`Unexpected response shape from prompts/get (prompt: ${promptName})`);
+  }
+  return { messages: typed.messages };
+}
