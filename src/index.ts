@@ -5,6 +5,8 @@ import {
   ReadResourceRequestSchema,
   ListToolsRequestSchema,
   CallToolRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
 interface Task {
@@ -58,6 +60,7 @@ const server = new Server(
     capabilities: {
       resources: {},
       tools: {},
+      prompts: {},
     },
   }
 );
@@ -464,6 +467,77 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
+});
+
+// PROMPTS - Parameterised prompt templates
+server.setRequestHandler(ListPromptsRequestSchema, async () => {
+  return {
+    prompts: [
+      {
+        name: "tasks_table",
+        description: "Get all tasks as a markdown table, sorted by the specified order",
+        arguments: [
+          {
+            name: "sort",
+            description: "Sort order: 'deadline' | 'priority' | 'priority-then-deadline'",
+            required: true,
+          },
+        ],
+      },
+    ],
+  };
+});
+
+server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+  const { name, arguments: promptArgs = {} } = request.params;
+
+  if (name !== "tasks_table") {
+    throw new Error(`Prompt not found: ${name}`);
+  }
+
+  const sort = promptArgs["sort"];
+  const allTasks = Array.from(tasks.values());
+  let sorted: Task[];
+
+  if (sort === "deadline") {
+    sorted = [...allTasks].sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return a.dueDate.localeCompare(b.dueDate);
+    });
+  } else if (sort === "priority") {
+    sorted = [...allTasks].sort((a, b) => {
+      const pDiff = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+      if (pDiff !== 0) return pDiff;
+      return a.id.localeCompare(b.id);
+    });
+  } else if (sort === "priority-then-deadline") {
+    sorted = [...allTasks].sort((a, b) => {
+      const pDiff = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+      if (pDiff !== 0) return pDiff;
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return a.dueDate.localeCompare(b.dueDate);
+    });
+  } else {
+    throw new Error(
+      `Invalid sort value: "${sort}". Must be one of: deadline, priority, priority-then-deadline`
+    );
+  }
+
+  return {
+    messages: [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: markdownTable(sorted),
+        },
+      },
+    ],
+  };
 });
 
 // Start the server
