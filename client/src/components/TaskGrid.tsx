@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import 'ag-grid-community/styles/ag-grid.css';
-import 'ag-grid-community/styles/ag-theme-quartz.css';
+import { themeQuartz } from 'ag-grid-community';
 import type { GridRow } from '../lib/parseMarkdownTable';
 import { TASK_COLUMN_DEFS, DEFAULT_COL_DEF } from '../lib/taskColumns';
 
@@ -25,8 +24,9 @@ export function TaskGrid({ rows, note, postAction }: TaskGridProps) {
         onChange={(e) => setFilterText(e.target.value)}
         aria-label="Filter grid rows"
       />
-      <div className="ag-theme-quartz" style={{ height: 400, width: '100%' }}>
+      <div style={{ height: 400, width: '100%' }}>
         <AgGridReact<GridRow>
+          theme={themeQuartz}
           rowData={rows}
           columnDefs={TASK_COLUMN_DEFS}
           defaultColDef={DEFAULT_COL_DEF}
