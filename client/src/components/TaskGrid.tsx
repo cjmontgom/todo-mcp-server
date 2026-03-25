@@ -6,15 +6,13 @@ import { TASK_COLUMN_DEFS, DEFAULT_COL_DEF } from '../lib/taskColumns';
 
 interface TaskGridProps {
   rows: GridRow[];
-  note?: string;
   postAction?: string;
 }
 
-export function TaskGrid({ rows, note, postAction }: TaskGridProps) {
+export function TaskGrid({ rows, postAction }: TaskGridProps) {
   const [filterText, setFilterText] = useState('');
   return (
     <div className="task-grid-wrapper">
-      {note && <p className="grid-note">{note}</p>}
       {postAction && <p className="post-action">{postAction}</p>}
       <input
         type="text"

@@ -1,18 +1,14 @@
 import { useState, useRef } from "react";
 import { useMcp } from "../context/McpContext";
+import { useDisplay } from "../context/DisplayContext";
 import { MCP_COPY } from "../copy/mcpExplainer";
 import { callTool } from "../mcp/client";
 import type { Tool, ToolCallResult } from "../mcp/client";
-import { TaskGrid } from "./TaskGrid";
 import { parseMarkdownTable } from "../lib/parseMarkdownTable";
-import type { GridRow } from "../lib/parseMarkdownTable";
 
 interface CallState {
-  status: "idle" | "loading" | "error" | "success";
-  text?: string;
-  rows?: GridRow[];
+  status: "idle" | "loading" | "error";
   error?: string;
-  isMutating?: boolean;
 }
 
 function schemaSummary(tool: Tool): string {
@@ -88,6 +84,7 @@ const MUTATING_TOOLS = new Set(["create_task", "update_task"]);
 
 export function ToolsPanel() {
   const { tools } = useMcp();
+  const { setDisplayContent } = useDisplay();
 
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
@@ -140,6 +137,8 @@ export function ToolsPanel() {
     const seq = ++submitSeqRef.current;
 
     setCallState({ status: "loading" });
+    setDisplayContent({ type: "loading", label: `Calling ${selectedTool!.name}…` });
+
     try {
       const result: ToolCallResult = await callTool(selectedTool!.name, args);
 
@@ -152,23 +151,71 @@ export function ToolsPanel() {
 
       if (result.isError) {
         setCallState({ status: "error", error: text || "Tool returned an error." });
+        setDisplayContent({ type: "error", message: text || "Tool returned an error." });
         return;
       }
 
+      setCallState({ status: "idle" });
+
       const rows = parseMarkdownTable(text);
-      setCallState({
-        status: "success",
-        text,
-        rows: rows.length > 0 ? rows : undefined,
-        isMutating,
-      });
+
+      if (isMutating) {
+        setDisplayContent({
+          type: "mutated",
+          text,
+          rows: rows.length > 0 ? rows : undefined,
+          postAction: MCP_COPY.postActionCall(selectedTool!.name),
+        });
+      } else if (rows.length > 0) {
+        setDisplayContent({
+          type: "grid",
+          rows,
+          postAction: MCP_COPY.postActionCall(selectedTool!.name),
+        });
+      } else {
+        setDisplayContent({
+          type: "text",
+          text,
+          postAction: MCP_COPY.postActionCall(selectedTool!.name),
+        });
+      }
     } catch (err) {
       if (seq !== submitSeqRef.current) return;
-      setCallState({
-        status: "error",
-        error: err instanceof Error ? err.message : String(err),
-      });
+      const message = err instanceof Error ? err.message : String(err);
+      setCallState({ status: "error", error: message });
+      setDisplayContent({ type: "error", message });
     }
+  }
+
+  function renderInlineForm(tool: Tool) {
+    return (
+      <form className="tool-form" onSubmit={handleSubmit} noValidate>
+        {Object.entries(tool.inputSchema.properties ?? {}).map(([name, schema]) => {
+          const required = new Set(tool.inputSchema.required ?? []);
+          return renderField(
+            name,
+            schema,
+            required.has(name),
+            formValues[name] ?? "",
+            validationErrors[name],
+            (val) => handleFieldChange(name, val)
+          );
+        })}
+
+        <button
+          type="submit"
+          className="submit-btn"
+          disabled={callState.status === "loading"}
+        >
+          {callState.status === "loading" && <span className="spinner" />}
+          {callState.status === "loading" ? "Calling…" : `Call ${tool.name}`}
+        </button>
+
+        {callState.status === "error" && (
+          <div className="error">{callState.error}</div>
+        )}
+      </form>
+    );
   }
 
   return (
@@ -194,93 +241,33 @@ export function ToolsPanel() {
       {tools.data.length > 0 && (
         <div className="item-list">
           {tools.data.map((t) => (
-            <div
-              key={t.name}
-              className={`item-card${selectedTool?.name === t.name ? " item-card--selected" : ""}`}
-              onClick={() => handleSelect(t)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  handleSelect(t);
-                }
-              }}
-              role="button"
-              tabIndex={0}
-            >
-              <p className="item-name">{t.name}</p>
-              {t.description && (
-                <p className="item-description">{t.description}</p>
-              )}
-              <p className="item-meta">
-                Parameters: <code>{schemaSummary(t)}</code>
-              </p>
+            <div key={t.name} className="item-card-wrapper">
+              <div
+                className={`item-card${selectedTool?.name === t.name ? " item-card--selected" : ""}`}
+                onClick={() => handleSelect(t)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleSelect(t);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+              >
+                <p className="item-name">{t.name}</p>
+                {t.description && (
+                  <p className="item-description">{t.description}</p>
+                )}
+                <p className="item-meta">
+                  Parameters: <code>{schemaSummary(t)}</code>
+                </p>
+              </div>
+              {selectedTool?.name === t.name && renderInlineForm(t)}
             </div>
           ))}
         </div>
       )}
 
-      {tools.status === "idle" && tools.data.length > 0 && (
-        <p className="post-action">{MCP_COPY.postActionListTools}</p>
-      )}
-
-      {selectedTool !== null && (
-        <form className="tool-form" onSubmit={handleSubmit} noValidate>
-          {Object.entries(selectedTool.inputSchema.properties ?? {}).map(([name, schema]) => {
-            const required = new Set(selectedTool.inputSchema.required ?? []);
-            return renderField(
-              name,
-              schema,
-              required.has(name),
-              formValues[name] ?? "",
-              validationErrors[name],
-              (val) => handleFieldChange(name, val)
-            );
-          })}
-
-          <button
-            type="submit"
-            className="submit-btn"
-            disabled={callState.status === "loading"}
-          >
-            {callState.status === "loading" && <span className="spinner" />}
-            {callState.status === "loading" ? "Calling…" : `Call ${selectedTool.name}`}
-          </button>
-        </form>
-      )}
-
-      {(callState.status === "error" || callState.status === "success") && (
-        <div className="call-result">
-          {callState.status === "error" && (
-            <div className="error">{callState.error}</div>
-          )}
-          {callState.status === "success" && (
-            <>
-              {callState.isMutating && (
-                <>
-                  <p className="tool-mutated-note">{MCP_COPY.toolMutatedNote}</p>
-                  <p className="tool-refresh-hint">{MCP_COPY.toolRefreshHint}</p>
-                </>
-              )}
-              {callState.rows && callState.rows.length > 0 ? (
-                <TaskGrid
-                  rows={callState.rows}
-                  note={MCP_COPY.gridNoteTool}
-                  postAction={MCP_COPY.postActionCall(selectedTool!.name)}
-                />
-              ) : (
-                <>
-                  <p className="post-action">
-                    {MCP_COPY.postActionCall(selectedTool!.name)}
-                  </p>
-                  {callState.text && (
-                    <pre className="tool-text-result">{callState.text}</pre>
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </div>
-      )}
     </section>
   );
 }

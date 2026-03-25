@@ -1,18 +1,14 @@
 import { useState, useRef } from "react";
 import { useMcp } from "../context/McpContext";
+import { useDisplay } from "../context/DisplayContext";
 import { MCP_COPY } from "../copy/mcpExplainer";
 import { getPrompt } from "../mcp/client";
 import type { Prompt } from "../mcp/client";
-import { TaskGrid } from "./TaskGrid";
 import { parseMarkdownTable } from "../lib/parseMarkdownTable";
-import type { GridRow } from "../lib/parseMarkdownTable";
 
 interface InvokeState {
-  status: "idle" | "loading" | "error" | "success";
-  text?: string;
-  rows?: GridRow[];
+  status: "idle" | "loading" | "error";
   error?: string;
-  isPureTable?: boolean;
 }
 
 function argumentsSummary(prompt: Prompt): string | null {
@@ -55,6 +51,7 @@ function renderArgField(
 
 export function PromptsPanel() {
   const { prompts } = useMcp();
+  const { setDisplayContent } = useDisplay();
 
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   const [argValues, setArgValues] = useState<Record<string, string>>({});
@@ -105,6 +102,7 @@ export function PromptsPanel() {
 
     const seq = ++submitSeqRef.current;
     setInvokeState({ status: "loading" });
+    setDisplayContent({ type: "loading", label: `Invoking ${selectedPrompt!.name}…` });
 
     try {
       const result = await getPrompt(selectedPrompt!.name, args);
@@ -118,21 +116,59 @@ export function PromptsPanel() {
 
       const rows = parseMarkdownTable(text);
       const hasTaskData = rows.some((r) => r.id || r.title);
-      const isPureTable = text.trimStart().startsWith("|");
 
-      setInvokeState({
-        status: "success",
-        text,
-        rows: hasTaskData ? rows : undefined,
-        isPureTable,
-      });
+      setInvokeState({ status: "idle" });
+
+      if (hasTaskData && rows.length > 0) {
+        setDisplayContent({
+          type: "grid",
+          rows,
+          postAction: MCP_COPY.postActionInvoke(selectedPrompt!.name),
+        });
+      } else if (text) {
+        setDisplayContent({
+          type: "text",
+          text,
+          postAction: MCP_COPY.postActionInvoke(selectedPrompt!.name),
+        });
+      }
     } catch (err) {
       if (seq !== submitSeqRef.current) return;
-      setInvokeState({
-        status: "error",
-        error: err instanceof Error ? err.message : String(err),
-      });
+      const message = err instanceof Error ? err.message : String(err);
+      setInvokeState({ status: "error", error: message });
+      setDisplayContent({ type: "error", message });
     }
+  }
+
+  function renderInlineForm(prompt: Prompt) {
+    return (
+      <form className="tool-form" onSubmit={handleInvoke} noValidate>
+        {(!prompt.arguments || prompt.arguments.length === 0) ? (
+          <p className="item-meta">{MCP_COPY.promptNoArgs}</p>
+        ) : (
+          prompt.arguments.map((arg) =>
+            renderArgField(
+              arg,
+              argValues[arg.name] ?? "",
+              argErrors[arg.name],
+              (val) => handleArgChange(arg.name, val)
+            )
+          )
+        )}
+        <button
+          type="submit"
+          className="submit-btn"
+          disabled={invokeState.status === "loading"}
+        >
+          {invokeState.status === "loading" && <span className="spinner" />}
+          {invokeState.status === "loading" ? "Invoking…" : `Invoke ${prompt.name}`}
+        </button>
+
+        {invokeState.status === "error" && (
+          <div className="error">{invokeState.error}</div>
+        )}
+      </form>
+    );
   }
 
   return (
@@ -160,99 +196,39 @@ export function PromptsPanel() {
           {prompts.data.map((p) => {
             const summary = argumentsSummary(p);
             return (
-              <div
-                key={p.name}
-                className={`item-card${selectedPrompt?.name === p.name ? " item-card--selected" : ""}`}
-                onClick={() => handleSelect(p)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleSelect(p);
-                  }
-                }}
-                role="button"
-                tabIndex={0}
-              >
-                <p className="item-name">{p.name}</p>
-                {p.description && (
-                  <p className="item-description">{p.description}</p>
-                )}
-                {summary && (
-                  <p className="item-meta">
-                    Arguments: <code>{summary}</code>
-                  </p>
-                )}
-                {(!p.arguments || p.arguments.length === 0) && (
-                  <p className="item-meta">No arguments</p>
-                )}
+              <div key={p.name} className="item-card-wrapper">
+                <div
+                  className={`item-card${selectedPrompt?.name === p.name ? " item-card--selected" : ""}`}
+                  onClick={() => handleSelect(p)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleSelect(p);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <p className="item-name">{p.name}</p>
+                  {p.description && (
+                    <p className="item-description">{p.description}</p>
+                  )}
+                  {summary && (
+                    <p className="item-meta">
+                      Arguments: <code>{summary}</code>
+                    </p>
+                  )}
+                  {(!p.arguments || p.arguments.length === 0) && (
+                    <p className="item-meta">No arguments</p>
+                  )}
+                </div>
+                {selectedPrompt?.name === p.name && renderInlineForm(p)}
               </div>
             );
           })}
         </div>
       )}
 
-      {prompts.status === "idle" && prompts.data.length > 0 && (
-        <p className="post-action">{MCP_COPY.postActionListPrompts}</p>
-      )}
-
-      {selectedPrompt !== null && (
-        <form className="tool-form" onSubmit={handleInvoke} noValidate>
-          {(!selectedPrompt.arguments || selectedPrompt.arguments.length === 0) ? (
-            <p className="item-meta">{MCP_COPY.promptNoArgs}</p>
-          ) : (
-            selectedPrompt.arguments.map((arg) =>
-              renderArgField(
-                arg,
-                argValues[arg.name] ?? "",
-                argErrors[arg.name],
-                (val) => handleArgChange(arg.name, val)
-              )
-            )
-          )}
-          <button
-            type="submit"
-            className="submit-btn"
-            disabled={invokeState.status === "loading"}
-          >
-            {invokeState.status === "loading" && <span className="spinner" />}
-            {invokeState.status === "loading" ? "Invoking…" : `Invoke ${selectedPrompt.name}`}
-          </button>
-        </form>
-      )}
-
-      {(invokeState.status === "error" || invokeState.status === "success") && (
-        <div className="call-result">
-          {invokeState.status === "error" && (
-            <div className="error">{invokeState.error}</div>
-          )}
-          {invokeState.status === "success" && (
-            <>
-              {invokeState.isPureTable && invokeState.rows && invokeState.rows.length > 0 ? (
-                <TaskGrid
-                  rows={invokeState.rows}
-                  note={MCP_COPY.gridNotePrompt}
-                  postAction={MCP_COPY.postActionInvoke(selectedPrompt!.name)}
-                />
-              ) : (
-                <>
-                  <p className="post-action">
-                    {MCP_COPY.postActionInvoke(selectedPrompt!.name)}
-                  </p>
-                  {invokeState.rows && invokeState.rows.length > 0 && (
-                    <TaskGrid
-                      rows={invokeState.rows}
-                      note={MCP_COPY.gridNotePrompt}
-                    />
-                  )}
-                  {invokeState.text && (
-                    <pre className="tool-text-result">{invokeState.text}</pre>
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </div>
-      )}
     </section>
   );
 }

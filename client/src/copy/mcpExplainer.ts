@@ -1,24 +1,16 @@
 export const MCP_COPY = {
-  appSubtitle: "Browse Resources, Tools, and Prompts exposed by the MCP server.",
+  appSubtitle: "In this application, you are the LLM (MCP client). Browse Resources, Tools, and Prompts exposed by the MCP server. The available resources, tools and prompts were fetched from the server via the resources/list, tools/list and prompts/list tools. They are a dynamic lists dependent on what is made available by the server.",
   resourcesBlurb:
-    "Resources are read-only data the server exposes by URI. Click a resource to Read it.",
+    "Resources are read-only data the server exposes by URI. Think of them like a simple GET with no params. You (the client) will have to figure out how to contextualise the raw data you recieve. Click a resource to Read it.",
   toolsBlurb:
-    "Tools are actions the client can invoke with arguments. Fill the form and Call a tool.",
+    "Tools are actions the client can invoke with arguments. They provide all the CRUD operations. They are the only way to mutate the server state, or read using a parameterised query. Again, what is returned is up to you to contextualise. Fill the form and Call a tool.",
   promptsBlurb:
-    "Prompts are pre-built messages the server returns. Invoke a prompt to get that content.",
+    "Prompts are pre-built messages the server returns in a structured 'LLM friendly' format. The message is opinionated and tells the LLM the purpose of the data as well providing the data itself. Invoke a prompt and check the network tab to see the response structure.",
   postActionRead: (uri: string) =>
     `You read ${uri} — the server returned this data as a Resource.`,
   postActionCall: (toolName: string) =>
     `You called ${toolName} — this Tool executed on the server.`,
   postActionInvoke: (promptName: string) =>
     `You invoked the ${promptName} prompt — this content came from a Prompt.`,
-  postActionListResources: "You listed Resources via resources/list.",
-  postActionListTools: "You listed Tools via tools/list.",
-  postActionListPrompts: "You listed Prompts via prompts/list.",
-  gridNoteResource: "This grid shows data Read from a Resource. We're using AG Grid as much as possible so you can learn it while learning MCP.",
-  toolMutatedNote: "You just used a Tool — the server state changed.",
-  toolRefreshHint: "Re-read any Resource above to see the updated task data.",
-  gridNoteTool: "This grid shows data returned by a Tool Call. Tools execute actions on the server — unlike Resources, which are read-only.",
-  gridNotePrompt: "This content came from a Prompt — shown here in the grid.",
   promptNoArgs: "No arguments — invoke directly.",
 } as const;
