@@ -13,7 +13,7 @@ export interface McpCapabilities {
 }
 
 export interface LlmOperation {
-  type: "resource_read" | "tool_call" | "prompt_get";
+  type: "resource_read" | "tool_call" | "prompt_get" | "none";
   params: Record<string, unknown>;
 }
 
@@ -60,7 +60,7 @@ Respond ONLY with a JSON object (no markdown fences, no extra text) in this exac
 {
   "explanation": "A brief human-readable explanation of what you're doing and why",
   "operation": {
-    "type": "resource_read" | "tool_call" | "prompt_get",
+    "type": "resource_read" | "tool_call" | "prompt_get" | "none",
     "params": { ... }
   }
 }
@@ -68,6 +68,15 @@ Respond ONLY with a JSON object (no markdown fences, no extra text) in this exac
 For resource_read: params must include "uri" (string).
 For tool_call: params must include "name" (string) and "arguments" (object matching the tool's input schema).
 For prompt_get: params must include "name" (string) and "arguments" (object with string values).
+For none: params should be {} (empty object).
+
+When the user references previous messages or results (e.g. "filter those", "now sort by deadline", "show me more details"), use the conversation history to determine what data or operation they are referring to. Choose the most appropriate MCP operation that fulfills their refined request.
+
+If the user's request cannot be mapped to any task management MCP operation (e.g. "what's the weather?", "tell me a joke"), respond with:
+{
+  "explanation": "A helpful message explaining this server manages tasks and suggesting 2-3 things the user can ask about",
+  "operation": { "type": "none", "params": {} }
+}
 
 Choose the most appropriate operation based on the user's intent. Prefer resources for read-only queries, tools for mutations or parameterised reads, and prompts for structured/summarised content.`;
 }
@@ -96,7 +105,7 @@ function validateOperation(parsed: unknown): LlmInterpretResponse {
   }
 
   const op = obj.operation as Record<string, unknown>;
-  const validTypes = ["resource_read", "tool_call", "prompt_get"];
+  const validTypes = ["resource_read", "tool_call", "prompt_get", "none"];
   if (!validTypes.includes(op.type as string)) {
     throw new Error(`Invalid operation type: ${op.type}`);
   }
@@ -117,6 +126,7 @@ function validateOperation(parsed: unknown): LlmInterpretResponse {
   if (opType === "prompt_get" && typeof params.name !== "string") {
     throw new Error("prompt_get operation requires a string 'name' param");
   }
+  // "none" type requires no param validation
 
   return {
     explanation: obj.explanation as string,

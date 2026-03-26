@@ -1,6 +1,6 @@
 # Story 5.2: Multi-turn Conversation and Educational Integration
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -37,38 +37,38 @@ So that I can explore task data naturally and learn how AI agents maintain conte
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Enhance system prompt for multi-turn context and non-MCP handling (`proxy/src/llm.ts`) (AC: #1, #4)
-  - [ ] 1.1 Update `buildSystemPrompt` to add a paragraph instructing the LLM to use conversation history for follow-up references (e.g. "the user may say 'filter those' or 'now sort by deadline' — infer the intended operation from prior context")
-  - [ ] 1.2 Add instruction for non-MCP requests: when the user asks something unrelated to task management, respond with `operation.type: "none"` and an explanation that this server handles task management only, with 2–3 concrete suggestions of what the user can ask
-  - [ ] 1.3 Add `"none"` to the JSON format specification in the system prompt: `"type": "resource_read" | "tool_call" | "prompt_get" | "none"`
-  - [ ] 1.4 For `"none"` type, document that `params` should be `{}` (empty object)
+- [x] Task 1: Enhance system prompt for multi-turn context and non-MCP handling (`proxy/src/llm.ts`) (AC: #1, #4)
+  - [x] 1.1 Update `buildSystemPrompt` to add a paragraph instructing the LLM to use conversation history for follow-up references (e.g. "the user may say 'filter those' or 'now sort by deadline' — infer the intended operation from prior context")
+  - [x] 1.2 Add instruction for non-MCP requests: when the user asks something unrelated to task management, respond with `operation.type: "none"` and an explanation that this server handles task management only, with 2–3 concrete suggestions of what the user can ask
+  - [x] 1.3 Add `"none"` to the JSON format specification in the system prompt: `"type": "resource_read" | "tool_call" | "prompt_get" | "none"`
+  - [x] 1.4 For `"none"` type, document that `params` should be `{}` (empty object)
 
-- [ ] Task 2: Update operation validation and types (`proxy/src/llm.ts`) (AC: #4)
-  - [ ] 2.1 Add `"none"` to the `LlmOperation["type"]` union: `"resource_read" | "tool_call" | "prompt_get" | "none"`
-  - [ ] 2.2 Update `validTypes` array in `validateOperation` to include `"none"`
-  - [ ] 2.3 No param validation needed for `"none"` type (skip the uri/name checks)
+- [x] Task 2: Update operation validation and types (`proxy/src/llm.ts`) (AC: #4)
+  - [x] 2.1 Add `"none"` to the `LlmOperation["type"]` union: `"resource_read" | "tool_call" | "prompt_get" | "none"`
+  - [x] 2.2 Update `validTypes` array in `validateOperation` to include `"none"`
+  - [x] 2.3 No param validation needed for `"none"` type (skip the uri/name checks)
 
-- [ ] Task 3: Handle `"none"` operation in proxy endpoint (`proxy/src/index.ts`) (AC: #4)
-  - [ ] 3.1 In the `/llm/interpret` handler, after `interpretWithLlm` returns, check if `op.type === "none"`
-  - [ ] 3.2 If `"none"`, skip the MCP bridge call entirely — return `{ explanation: intent.explanation, operation: intent.operation, mcpResult: null }` immediately
-  - [ ] 3.3 Existing `resource_read` / `tool_call` / `prompt_get` branches remain unchanged
+- [x] Task 3: Handle `"none"` operation in proxy endpoint (`proxy/src/index.ts`) (AC: #4)
+  - [x] 3.1 In the `/llm/interpret` handler, after `interpretWithLlm` returns, check if `op.type === "none"`
+  - [x] 3.2 If `"none"`, skip the MCP bridge call entirely — return `{ explanation: intent.explanation, operation: intent.operation, mcpResult: null }` immediately
+  - [x] 3.3 Existing `resource_read` / `tool_call` / `prompt_get` branches remain unchanged
 
-- [ ] Task 4: Update client types for optional mcpResult (`client/src/mcp/client.ts`) (AC: #4)
-  - [ ] 4.1 Change `LlmInterpretResult.mcpResult` type from `unknown` to `unknown | null` (or keep `unknown` since `null` is assignable to `unknown` — just ensure the ChatPanel handles `null`)
+- [x] Task 4: Update client types for optional mcpResult (`client/src/mcp/client.ts`) (AC: #4)
+  - [x] 4.1 Change `LlmInterpretResult.mcpResult` type from `unknown` to `unknown | null` (or keep `unknown` since `null` is assignable to `unknown` — just ensure the ChatPanel handles `null`)
 
-- [ ] Task 5: Handle conversational responses in ChatPanel (`client/src/components/ChatPanel.tsx`) (AC: #1, #4)
-  - [ ] 5.1 In `handleSubmit`, after receiving the result, check if `result.operation.type === "none"` or `result.mcpResult === null`
-  - [ ] 5.2 If `"none"`: add the assistant message with `result.explanation` but do NOT call `setDisplayContent` — leave the DetailPanel showing its current content
-  - [ ] 5.3 If an MCP operation was executed: continue with the existing `displayMcpResult` flow (no changes to existing logic)
+- [x] Task 5: Handle conversational responses in ChatPanel (`client/src/components/ChatPanel.tsx`) (AC: #1, #4)
+  - [x] 5.1 In `handleSubmit`, after receiving the result, check if `result.operation.type === "none"` or `result.mcpResult === null`
+  - [x] 5.2 If `"none"`: add the assistant message with `result.explanation` but do NOT call `setDisplayContent` — leave the DetailPanel showing its current content
+  - [x] 5.3 If an MCP operation was executed: continue with the existing `displayMcpResult` flow (no changes to existing logic)
 
-- [ ] Task 6: Add educational copy for multi-turn and non-MCP responses (`client/src/copy/mcpExplainer.ts`) (AC: #3, #4)
-  - [ ] 6.1 Add `multiTurnNote: "The AI used your conversation history to understand the follow-up — this is how AI agents maintain context across multiple MCP interactions."` — used optionally in chat responses when the LLM clearly references prior context
-  - [ ] 6.2 Verify existing `postActionAiCall` copy matches AC3 educational intent ("Tools change server state, unlike Resources which are read-only") — current copy already conveys this; no change needed unless exact wording is required
+- [x] Task 6: Add educational copy for multi-turn and non-MCP responses (`client/src/copy/mcpExplainer.ts`) (AC: #3, #4)
+  - [x] 6.1 Add `multiTurnNote: "The AI used your conversation history to understand the follow-up — this is how AI agents maintain context across multiple MCP interactions."` — used optionally in chat responses when the LLM clearly references prior context
+  - [x] 6.2 Verify existing `postActionAiCall` copy matches AC3 educational intent ("Tools change server state, unlike Resources which are read-only") — current copy already conveys this; no change needed unless exact wording is required
 
-- [ ] Task 7: Build and verify (AC: all)
-  - [ ] 7.1 `cd proxy && npm run build` — zero TypeScript errors
-  - [ ] 7.2 `cd client && npm run build` — zero TypeScript errors
-  - [ ] 7.3 `cd client && npm run lint` — zero ESLint errors
+- [x] Task 7: Build and verify (AC: all)
+  - [x] 7.1 `cd proxy && npm run build` — zero TypeScript errors
+  - [x] 7.2 `cd client && npm run build` — zero TypeScript errors
+  - [x] 7.3 `cd client && npm run lint` — zero ESLint errors
   - [ ] 7.4 Manual tab works identically to pre-story behavior (no regression)
   - [ ] 7.5 AI tab: type "show me all tasks" → get result in grid → type "now show just the high priority ones" → LLM uses context → new result in grid
   - [ ] 7.6 AI tab: type "what's the weather?" → LLM returns helpful fallback explanation, no grid update
@@ -266,10 +266,29 @@ Files modified in 5.1 that this story also modifies:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude claude-4.6-opus-high-thinking (via Cursor)
 
 ### Debug Log References
 
+No debug issues encountered.
+
 ### Completion Notes List
 
+- Task 1: Enhanced `buildSystemPrompt` in `proxy/src/llm.ts` with multi-turn follow-up instructions (telling the LLM to use conversation history for references like "filter those") and non-MCP request handling instructions (respond with `"none"` type and helpful suggestions). Updated the JSON format spec to include `"none"` type with `{}` params.
+- Task 2: Added `"none"` to `LlmOperation["type"]` union and `validTypes` array in `validateOperation`. No param validation needed for `"none"` type.
+- Task 3: Added short-circuit in `/llm/interpret` handler: when `op.type === "none"`, returns `{ explanation, operation, mcpResult: null }` without calling the MCP bridge. Inserted before existing operation branches.
+- Task 4: Verified `LlmInterpretResult.mcpResult: unknown` already accepts `null` in TypeScript — no type change needed. ChatPanel handles `null` via guard clause.
+- Task 5: Added guard clause in `ChatPanel.handleSubmit` before `displayMcpResult`: if `result.operation?.type === "none"` or `result.mcpResult === null`, the assistant message is shown but the DetailPanel is not updated.
+- Task 6: Added `multiTurnNote` key to `MCP_COPY` in `mcpExplainer.ts`. Verified existing `postActionAiCall` copy already conveys the Tools vs Resources educational distinction — no change needed.
+- Task 7: All three build/lint checks pass with zero errors: `proxy build`, `client build`, `client lint`. Manual verification subtasks (7.4–7.9) require Ollama running and are deferred to manual testing.
+
+### Change Log
+
+- feat(5.2): multi-turn conversation and non-MCP request handling (Date: 2026-03-26)
+
 ### File List
+
+- `proxy/src/llm.ts` — MODIFIED: system prompt enhancement, `"none"` type in LlmOperation union and validateOperation
+- `proxy/src/index.ts` — MODIFIED: short-circuit for `"none"` operation (skip MCP bridge call)
+- `client/src/components/ChatPanel.tsx` — MODIFIED: guard clause to skip displayMcpResult for `"none"` operations
+- `client/src/copy/mcpExplainer.ts` — MODIFIED: added `multiTurnNote` educational copy key

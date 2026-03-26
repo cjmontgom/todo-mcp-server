@@ -51,7 +51,11 @@ export function ChatPanel({ messages, onMessagesChange }: ChatPanelProps) {
       };
       onMessagesChange([...updated, assistantMsg]);
 
-      displayMcpResult(result);
+      if (result.operation?.type === "none" || result.mcpResult === null) {
+        // Conversational response — don't update DetailPanel
+      } else {
+        displayMcpResult(result);
+      }
     } catch (err) {
       const errorText = err instanceof Error ? err.message : String(err);
       const isOllamaDown =

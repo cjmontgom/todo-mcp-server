@@ -144,6 +144,16 @@ app.post("/llm/interpret", async (req, res) => {
     );
 
     const op = intent.operation;
+
+    if (op.type === "none") {
+      res.json({
+        explanation: intent.explanation,
+        operation: intent.operation,
+        mcpResult: null,
+      });
+      return;
+    }
+
     const toObj = (v: unknown) =>
       typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
 
