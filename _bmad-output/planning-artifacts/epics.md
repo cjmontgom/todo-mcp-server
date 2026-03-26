@@ -99,6 +99,7 @@ UX-DR10: Chat panel with persistent text input and scrollable conversation histo
 UX-DR11: After the LLM executes an MCP operation, a brief educational note appears in the chat response explaining which MCP capability was used (e.g. "I read the resource task://table/by-priority to show you this data").
 UX-DR12: Loading state visible in the chat panel while the LLM is processing (typing indicator or spinner); input disabled during processing to prevent duplicate requests.
 UX-DR13: LLM or MCP errors surfaced inline in the chat conversation as error messages, not silent failures.
+UX-DR14: Left column uses a two-tab navigation: "You are the MCP Client" (manual panels: Resources, Tools, Prompts) and "Ollama is the MCP Client" (ChatPanel). Both tabs share the same right-column DetailPanel for displaying MCP results, reinforcing that the MCP operation outcome is identical regardless of who initiated it. App subtitle adapts per tab or generalises across both modes.
 ```
 
 ### FR Coverage Map
@@ -138,7 +139,7 @@ UX-DR13: LLM or MCP errors surfaced inline in the chat conversation as error mes
 | FR31 | Epic 5 | Execute LLM-selected MCP operation, display in grid |
 | FR32 | Epic 5 | Multi-turn conversation history |
 
-**NFR touchpoints:** NFR2 across Epics 1–3 (additive server/proxy); NFR1, NFR3, NFR4 primarily Epic 4; NFR2 also Epic 4 (no breaking desktop behavior). NFR1 also Epic 5 (educational LLM-to-MCP explanations).
+**NFR touchpoints:** NFR2 across Epics 1–3 (additive server/proxy); NFR1, NFR3, NFR4 primarily Epic 4; NFR2 also Epic 4 (no breaking desktop behavior). NFR1 also Epic 5 (educational LLM-to-MCP explanations). UX-DR14 in Epic 5 (tab-based manual vs AI-mediated navigation sharing the DetailPanel).
 
 ## Epic List
 
@@ -190,11 +191,11 @@ UX-DR13: LLM or MCP errors surfaced inline in the chat conversation as error mes
 
 ### Epic 5: Natural language MCP interaction via LLM
 
-**User outcome:** Learners type plain-language requests into a chat interface and watch an LLM interpret them, select the right MCP operation, execute it, and display the results — demonstrating how AI agents interact with MCP servers under the hood.
+**User outcome:** Learners type plain-language requests into a chat interface and watch an LLM interpret them, select the right MCP operation, execute it, and display the results — demonstrating how AI agents interact with MCP servers under the hood. A two-tab navigation ("You are the MCP Client" / "Ollama is the MCP Client") lets learners switch between manual and AI-mediated modes while sharing the same DetailPanel for results.
 
 **FRs covered:** FR29, FR30, FR31, FR32
 
-**Standalone:** Adds AI-mediated MCP interaction layer on top of the manual UI.
+**Standalone:** Adds AI-mediated MCP interaction layer on top of the manual UI via tab-based navigation in the left column.
 
 **Depends on:** Epic 3 (proxy running), Epic 4 (React app with AG Grid and MCP client infrastructure).
 
@@ -640,9 +641,10 @@ So that I never have to guess what the app is doing or what MCP concept I just e
 Learners can type plain-language requests into a chat interface and watch an LLM interpret them, select the right MCP operation (resource read, tool call, or prompt invocation), execute it, and display the results — demonstrating how AI agents interact with MCP servers under the hood.
 
 **FRs covered:** FR29, FR30, FR31, FR32
-**UX-DRs covered:** UX-DR10, UX-DR11, UX-DR12, UX-DR13
+**UX-DRs covered:** UX-DR10, UX-DR11, UX-DR12, UX-DR13, UX-DR14
 **Depends on:** Epic 3 (proxy running), Epic 4 (React app with AG Grid and MCP client infrastructure)
 **Additional:** LLM endpoint on proxy; `LLM_BASE_URL` and `LLM_MODEL` env vars; Ollama as default LLM provider (no SDK — fetch against OpenAI-compatible API); configurable for cloud providers. `ChatPanel.tsx` component; conversation state in React context or local state.
+**UI design:** The left column gains a two-tab navigation — **"You are the MCP Client"** (the existing manual panels from Epic 4) and **"Ollama is the MCP Client"** (the ChatPanel). Both tabs share the same right-column DetailPanel for displaying MCP operation results. This reinforces the core lesson: the MCP operations and their outputs are identical whether initiated manually or by an LLM. Tab labels and subtitle copy should use MCP-correct terminology (the user/LLM acts as the MCP *client*, not the server).
 
 ---
 
@@ -659,12 +661,12 @@ So that an AI interprets my request, executes the right MCP operation, and shows
 **Then** the proxy calls the LLM API with a system prompt describing all available MCP capabilities (from `resources/list`, `tools/list`, `prompts/list`) and returns a structured response containing: the MCP operation to execute (`type`, `params`), a human-readable explanation, and the MCP operation result
 
 **Given** the React app is loaded
-**When** the user navigates to the chat panel
-**Then** a text input and conversation area are visible; the input accepts free-text entry and submits on Enter or button click
+**When** the user clicks the "Ollama is the MCP Client" tab in the left column
+**Then** the manual panels (Resources, Tools, Prompts) are replaced by a ChatPanel with a text input and scrollable conversation area; the input accepts free-text entry and submits on Enter or button click; the right-column DetailPanel remains visible and shared (UX-DR14)
 
 **Given** the user types "show me overdue tasks sorted by priority" and submits
 **When** the proxy processes the request
-**Then** the LLM selects the appropriate MCP operation (e.g. read `task://table/by-priority` or invoke `tasks_summary_for_stakeholders`), the proxy executes it, and the chat panel displays: (1) the AI's explanation of what it did, (2) the MCP result in AG Grid if tabular, and (3) an educational note like "The AI read the resource task://table/by-priority — this is exactly how an MCP client uses Resources." (FR31, UX-DR11)
+**Then** the LLM selects the appropriate MCP operation (e.g. read `task://table/by-priority` or invoke `tasks_summary_for_stakeholders`), the proxy executes it, and: (1) the chat panel displays the AI's explanation of what it did with an educational note like "The AI read the resource task://table/by-priority — this is exactly how an MCP client uses Resources."; (2) tabular MCP results are rendered in the shared right-column DetailPanel via the same `setDisplayContent` mechanism used by the manual panels, reinforcing that the MCP output is identical regardless of who initiated it (FR31, UX-DR11, UX-DR14)
 
 **Given** the LLM request is in-flight
 **When** the user waits
@@ -704,9 +706,9 @@ So that I can explore task data naturally and learn how AI agents maintain conte
 **When** the LLM responds
 **Then** the AI explains that this MCP server only supports task management operations and suggests what the user can ask about
 
-**Given** all previous Epic 4 panels (Resources, Tools, Prompts) are active
-**When** the user interacts with the chat panel
-**Then** the chat panel coexists with the manual panels; results from either can be viewed without interference; the user can switch freely between manual MCP interaction and AI-mediated interaction
+**Given** the two-tab left column is rendered ("You are the MCP Client" / "Ollama is the MCP Client")
+**When** the user switches between tabs
+**Then** the left column swaps between the manual panels (Resources, Tools, Prompts) and the ChatPanel; the right-column DetailPanel retains or updates its content based on the most recent MCP operation from either tab; conversation history in the ChatPanel persists across tab switches; the user can freely alternate between manual and AI-mediated MCP interaction (UX-DR14)
 
 ---
 

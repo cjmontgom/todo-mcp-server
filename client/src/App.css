@@ -29,6 +29,33 @@
   padding: 24px 32px;
 }
 
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab-button {
+  flex: 1;
+  padding: 12px 16px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab-button:hover {
+  color: var(--text-h);
+}
+
+.tab-button--active {
+  color: var(--text-h);
+  border-bottom-color: var(--accent);
+}
+
 @media (min-width: 768px) {
   .app-layout {
     display: grid;

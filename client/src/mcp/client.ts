@@ -166,3 +166,49 @@ export async function getPrompt(
   }
   return { messages: typed.messages };
 }
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface LlmInterpretResult {
+  explanation: string;
+  operation: { type: string; params: Record<string, unknown> };
+  mcpResult: unknown;
+}
+
+export async function interpretMessage(
+  message: string,
+  history: ChatMessage[],
+): Promise<LlmInterpretResult> {
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}/llm/interpret`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, history }),
+    });
+  } catch {
+    throw new Error(`Proxy unreachable at ${BASE_URL}. Is it running?`);
+  }
+
+  if (!response.ok) {
+    let errorBody: { error?: string } | undefined;
+    try {
+      errorBody = (await response.json()) as { error?: string };
+    } catch { /* non-JSON error response */ }
+    throw new Error(
+      errorBody?.error ?? `Proxy returned HTTP ${response.status}: ${response.statusText}`,
+    );
+  }
+
+  let data: LlmInterpretResult;
+  try {
+    data = (await response.json()) as LlmInterpretResult;
+  } catch {
+    throw new Error(`Proxy returned non-JSON response (HTTP ${response.status})`);
+  }
+
+  return data;
+}
