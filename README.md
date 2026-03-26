@@ -64,56 +64,6 @@ npm run dev --prefix proxy
 npm run dev --prefix client
 ```
 
-## What This Project Covers
-
-### MCP Concepts (taught through the UI)
-
-| Concept | How it's exposed |
-|---------|-----------------|
-| **Resources** | Read-only data by URI — list and read in the Resources panel; results shown in AG Grid |
-| **Tools** | Actions with JSON Schema inputs — fill a schema-driven form and call; state changes confirmed with educational copy |
-| **Prompts** | Pre-built messages the server returns — invoke with optional arguments; results shown in AG Grid |
-| **Transport** | STDIO for native clients (Claude Desktop, Cursor); HTTP/SSE for the browser via proxy |
-
-### MCP Server Capabilities
-
-**Resources**
-
-| URI | Description |
-|-----|-------------|
-| `task://all` | All tasks as JSON |
-| `task://summary` | Task statistics summary (text) |
-| `task://table/all` | All tasks as a markdown table |
-| `task://table/by-deadline` | Tasks sorted by due date |
-| `task://table/by-priority` | Tasks sorted by priority |
-| `task://table/priority-then-deadline` | Tasks sorted by priority, then due date |
-| `task://open` | Only todo and in-progress tasks |
-
-**Tools**
-
-| Tool | Description |
-|------|-------------|
-| `create_task` | Add a task with title, description, priority, and optional due date |
-| `update_task` | Update any task field (title, description, status, priority, dueDate) |
-| `get_task` | Retrieve details for a single task |
-| `delete_task` | Remove a task |
-
-**Prompts**
-
-| Prompt | Arguments | Description |
-|--------|-----------|-------------|
-| `tasks_table` | `sort` (deadline \| priority \| priority-then-deadline) | Markdown table of tasks |
-| `tasks_summary_for_stakeholders` | — | Counts by status, overdue tasks |
-| `completions_by_date` | `from`, `to` (optional) | Completed tasks by date |
-
-### AG Grid Learning
-
-Every panel in the React app uses AG Grid to display tabular data (from Resources, Tools, and Prompts) with client-side sort and filter — so you practise AG Grid column defs, data binding, and multiple data sources alongside MCP concepts.
-
-### Natural Language Chat (Ollama)
-
-The "Ollama is the MCP Client" tab provides a chat interface where you type plain-language requests (eg. "show me overdue tasks sorted by priority"). The proxy interprets the request via a local LLM and selects the appropriate MCP operation, which the app executes and displays in AG Grid with an explanation of what capability was used and why.
-
 #### Ollama Setup
 
 The chat tab requires [Ollama](https://ollama.com/) running locally. If you skip this, the rest of the app works fine — only the AI chat tab is affected.
@@ -156,6 +106,8 @@ The defaults point to Ollama (`http://localhost:11434`, model `llama3.1`). To us
 
 ## Configure with Claude Desktop
 
+The MCP server works as a standalone app for use with other native MCP clients able to send STDIO, such as Claude desktop.
+
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
@@ -169,26 +121,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-Replace `/absolute/path/to/` with your actual path. The server uses STDIO transport and is fully compatible with any MCP host.
-
-## Setup
-
-```bash
-# Clone and install root dependencies (MCP server + concurrently)
-npm install
-
-# Install proxy dependencies
-npm install --prefix proxy
-
-# Install React client dependencies
-npm install --prefix client
-
-# Build the MCP server
-npm run build
-
-# Start everything
-npm run dev
-```
+Replace `/absolute/path/to/` with your actual path.
 
 ## Key Learnings
 
