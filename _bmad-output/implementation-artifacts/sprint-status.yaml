@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-18
-last_updated: 2026-03-26  # updated: Story 5.1 review
+last_updated: 2026-03-26  # updated: Story 5.1 done
 project: todo-mcp-server
 project_key: NOKEY
 tracking_system: file-system
@@ -71,6 +71,6 @@ development_status:
 
   # ── Epic 5: Natural Language MCP Interaction via LLM ──
   epic-5: in-progress
-  5-1-add-llm-interpretation-endpoint-and-chat-ui: review
-  5-2-multi-turn-conversation-and-educational-integration: backlog
+  5-1-add-llm-interpretation-endpoint-and-chat-ui: done
+  5-2-multi-turn-conversation-and-educational-integration: ready-for-dev
   epic-5-retrospective: optional

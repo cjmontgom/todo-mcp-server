@@ -110,16 +110,49 @@ npm run dev --prefix client
 
 Every panel in the React app uses AG Grid to display tabular data (from Resources, Tools, and Prompts) with client-side sort and filter — so you practise AG Grid column defs, data binding, and multiple data sources alongside MCP concepts.
 
-### Natural Language Chat
+### Natural Language Chat (Ollama)
 
-A chat interface lets you type plain-language requests ("show me overdue tasks sorted by priority"). The proxy interprets the request via a local LLM (Ollama, `http://localhost:11434` by default) and selects the appropriate MCP operation, which the app executes and displays in AG Grid with an explanation of what capability was used and why.
+The "Ollama is the MCP Client" tab provides a chat interface where you type plain-language requests (eg. "show me overdue tasks sorted by priority"). The proxy interprets the request via a local LLM and selects the appropriate MCP operation, which the app executes and displays in AG Grid with an explanation of what capability was used and why.
 
-Configure the LLM via proxy environment variables:
+#### Ollama Setup
+
+The chat tab requires [Ollama](https://ollama.com/) running locally. If you skip this, the rest of the app works fine — only the AI chat tab is affected.
+
+1. **Install Ollama:**
 
 ```bash
-LLM_BASE_URL=http://localhost:11434   # Ollama default
-LLM_MODEL=llama3                      # or any Ollama model
+brew install ollama
 ```
+
+Or download from [ollama.com/download](https://ollama.com/download) for other platforms.
+
+2. **Start Ollama** (runs in the background on port 11434):
+
+```bash
+ollama serve
+```
+
+On macOS, Ollama may already be running as a menu bar app after installation. You can verify with:
+
+```bash
+curl http://localhost:11434/v1/models
+```
+
+3. **In a new terminal tab, pull Ollama's default model** 
+
+```bash
+ollama pull llama3.1
+```
+
+#### LLM Configuration
+
+The proxy reads LLM settings from `proxy/.env`. Copy the example and edit as needed:
+
+```bash
+cp proxy/.env.example proxy/.env
+```
+
+The defaults point to Ollama (`http://localhost:11434`, model `llama3.1`). To use a different model or provider, just edit `proxy/.env` — any OpenAI-compatible API works (Ollama, OpenAI, Anthropic-compatible, etc.). See `proxy/.env.example` for examples.
 
 ## Configure with Claude Desktop
 

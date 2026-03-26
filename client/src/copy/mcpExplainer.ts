@@ -18,11 +18,11 @@ export const MCP_COPY = {
   postActionInvoke: (promptName: string) =>
     `You invoked the ${promptName} prompt — this content came from a Prompt.`,
   postActionAiRead: (uri: string) =>
-    `The AI read the resource ${uri} — this is exactly how an MCP client uses Resources.`,
+    `The AI read ${uri} — the server returned this data as a Resource.`,
   postActionAiCall: (toolName: string) =>
-    `The AI called the ${toolName} tool — this is how an MCP client uses Tools to mutate state or run parameterised queries.`,
+    `The AI called the ${toolName} tool — tool — this Tool executed on the server.`,
   postActionAiInvoke: (promptName: string) =>
-    `The AI invoked the ${promptName} prompt — this is how an MCP client uses Prompts to get structured, LLM-oriented content.`,
+    `The AI invoked the ${promptName} prompt — this content came from a Prompt.`,
   promptNoArgs: "No arguments — invoke directly.",
   ollamaSetupHint:
     "LLM features require Ollama running locally. Install: brew install ollama && ollama pull llama3.1",

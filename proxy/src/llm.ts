@@ -186,6 +186,8 @@ export async function interpretWithLlm(
   }
 
   const content = choices[0].message?.content;
+  console.log("[LLM] Raw response content:\n", content);
+
   if (typeof content !== "string" || !content.trim()) {
     throw new Error("LLM returned empty content");
   }
@@ -195,7 +197,7 @@ export async function interpretWithLlm(
     parsed = extractJson(content);
   } catch {
     throw new Error(
-      "LLM returned an unstructured response. Try rephrasing.",
+      `LLM returned an unstructured response. Raw content:\n${content}`,
     );
   }
 

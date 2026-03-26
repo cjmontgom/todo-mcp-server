@@ -45,14 +45,9 @@ export function ChatPanel({ messages, onMessagesChange }: ChatPanelProps) {
     try {
       const result = await interpretMessage(trimmed, history);
 
-      const educationalNote = getEducationalNote(result.operation);
-      const content = educationalNote
-        ? `${result.explanation}\n\n${educationalNote}`
-        : result.explanation;
-
       const assistantMsg: ChatMessageDisplay = {
         role: "assistant",
-        content,
+        content: result.explanation,
       };
       onMessagesChange([...updated, assistantMsg]);
 
@@ -73,22 +68,6 @@ export function ChatPanel({ messages, onMessagesChange }: ChatPanelProps) {
     } finally {
       setIsLoading(false);
     }
-  }
-
-  function getEducationalNote(operation: {
-    type: string;
-    params: Record<string, unknown>;
-  }): string | null {
-    if (operation.type === "resource_read") {
-      return MCP_COPY.postActionAiRead(operation.params.uri as string);
-    }
-    if (operation.type === "tool_call") {
-      return MCP_COPY.postActionAiCall(operation.params.name as string);
-    }
-    if (operation.type === "prompt_get") {
-      return MCP_COPY.postActionAiInvoke(operation.params.name as string);
-    }
-    return null;
   }
 
   function displayMcpResult(result: {
