@@ -730,3 +730,65 @@ Trade-offs to evaluate during story creation:
 - May be better suited as an optional "advanced mode" toggle rather than the default implementation
 
 **Recommendation:** Evaluate during Story 5.1 planning whether to use sampling natively, keep the proxy approach, or support both as a teaching comparison.
+
+---
+
+## Epic 6: MCP Sampling — Task Enrichment and the Fourth Primitive
+
+Learners discover MCP Sampling — the fourth primitive — by seeing the server autonomously request LLM completions during task creation. When a user creates a task with minimal input, the server uses `sampling/createMessage` to ask the client's LLM to enrich it with a better title, description, priority, and due date estimate. The educational UI explains how sampling inverts the usual client→server direction, letting the server request intelligence from the client.
+
+**FRs covered:** FR33 (sampling-based enrichment), FR34 (sampling educational UI)
+**Depends on:** Epic 1 (task model + create_task tool), Epic 3 (proxy), Epic 5 (Ollama/LLM integration on proxy)
+**Additional:** Extends proxy bridge to handle server→client requests; new Sampling educational section in React app; `@modelcontextprotocol/sdk` v1.x sampling API.
+
+---
+
+### Story 6.1: Add sampling-based task enrichment to server and proxy
+
+As a developer or learner using the MCP server,
+I want the server to use MCP Sampling to automatically enrich vague task inputs with better titles, descriptions, priority, and due date suggestions,
+So that I can see the fourth MCP primitive (Sampling) in action and understand how an MCP server can request LLM completions from the client.
+
+**Acceptance Criteria:**
+
+**Given** the server is running and a connected client supports sampling
+**When** a client calls `create_task` with a minimal title (e.g., "fix bug")
+**Then** the server calls `server.createMessage(...)` with a prompt asking the LLM to suggest improvements
+**And** the server applies the LLM's suggestions to enrich the task
+
+**Given** the server is running and a connected client does NOT support sampling
+**When** a client calls `create_task`
+**Then** the task is created with the original input unchanged (existing behavior preserved)
+**And** no error is thrown
+
+**Given** the proxy is running and the server sends a `sampling/createMessage` request over STDIO
+**When** the proxy receives it
+**Then** the proxy calls Ollama, returns the LLM response to the server, and the tool call completes with enriched data
+
+**Given** any non-`create_task` tool is called
+**When** the tool executes
+**Then** behavior is identical to before — no sampling used
+
+---
+
+### Story 6.2: Add Sampling educational section to React client
+
+As a learner using the React app,
+I want a dedicated Sampling section that explains this fourth MCP primitive and shows me the enrichment flow in action,
+So that I understand how MCP servers can request LLM completions from clients and see the server→client direction of the protocol.
+
+**Acceptance Criteria:**
+
+**Given** the React app is loaded
+**When** the user navigates to a Sampling section (new tab or panel)
+**Then** educational copy explains what Sampling is, how it differs from Resources/Tools/Prompts, and that it represents a server→client request
+
+**Given** the user creates a task through the manual Tools panel
+**When** enrichment occurs via sampling
+**Then** the UI shows both the original input and the enriched result with a note explaining that the server used Sampling to request an LLM completion
+
+**Given** the Sampling section is visible
+**When** the user reads the educational content
+**Then** the copy explains the `sampling/createMessage` flow: server sends request → client calls LLM → client returns response → server uses it
+
+---

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-18
-last_updated: 2026-03-26  # updated: Story 5.2 review
+last_updated: 2026-03-30  # updated: Story 6.1 moved to review
 project: todo-mcp-server
 project_key: NOKEY
 tracking_system: file-system
@@ -74,3 +74,9 @@ development_status:
   5-1-add-llm-interpretation-endpoint-and-chat-ui: done
   5-2-multi-turn-conversation-and-educational-integration: review
   epic-5-retrospective: optional
+
+  # ── Epic 6: MCP Sampling — Task Enrichment and the Fourth Primitive ──
+  epic-6: done
+  6-1-add-sampling-based-task-enrichment-to-server: done
+  6-2-add-sampling-educational-section-to-react-client: backlog
+  epic-6-retrospective: optional

@@ -9,6 +9,7 @@ import {
   gatherCapabilities,
   type McpCapabilities,
 } from "./llm.js";
+import { handleSamplingRequest } from "./sampling.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || "3001", 10);
@@ -58,8 +59,27 @@ bridge.on("error", (err: Error) => {
   console.error("MCP server bridge error:", err.message);
 });
 
+bridge.on("serverRequest", async (msg: Record<string, unknown>) => {
+  const method = msg.method as string;
+  const id = msg.id as string | number;
+  const params = msg.params as Record<string, unknown> | undefined;
+
+  if (method === "sampling/createMessage") {
+    try {
+      const result = await handleSamplingRequest(params ?? {});
+      bridge.respondToServer(id, result);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Sampling failed";
+      console.error(`[sampling] Error: ${errMsg}`);
+      bridge.respondErrorToServer(id, -32603, errMsg);
+    }
+  } else {
+    bridge.respondErrorToServer(id, -32601, `Unsupported server request: ${method}`);
+  }
+});
+
 app.post("/mcp", async (req, res) => {
-  const body = req.body;
+  let body = req.body;
   if (!body || body.jsonrpc !== "2.0" || !body.method || body.id == null) {
     res.status(400).json({
       jsonrpc: "2.0",
@@ -76,6 +96,19 @@ app.post("/mcp", async (req, res) => {
       error: { code: -32603, message: "MCP server is not available" },
     });
     return;
+  }
+
+  if (body.method === "initialize") {
+    body = {
+      ...body,
+      params: {
+        ...body.params,
+        capabilities: {
+          ...(body.params?.capabilities ?? {}),
+          sampling: {},
+        },
+      },
+    };
   }
 
   try {

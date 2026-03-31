@@ -4,6 +4,7 @@
     "type": "module",
     "scripts": {
         "build": "tsc",
+        "test": "vitest run",
         "start": "node build/index.js",
         "dev": "concurrently --names \"server,proxy,client\" --prefix-colors \"blue,yellow,green\" \"npm run start\" \"npm run dev --prefix proxy\" \"npm run dev --prefix client\""
     },
@@ -13,6 +14,7 @@
     "devDependencies": {
         "@types/node": "^22.10.5",
         "concurrently": "^9.2.1",
-        "typescript": "^5.7.2"
+        "typescript": "^5.7.2",
+        "vitest": "^4.1.2"
     }
 }

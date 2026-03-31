@@ -34,11 +34,15 @@ export class McpServerBridge extends EventEmitter {
       }
 
       if ("id" in msg && msg.id != null) {
-        const entry = this.pending.get(msg.id as string | number);
-        if (entry) {
-          clearTimeout(entry.timer);
-          entry.resolve(msg);
-          this.pending.delete(msg.id as string | number);
+        if ("method" in msg && typeof msg.method === "string") {
+          this.emit("serverRequest", msg);
+        } else {
+          const entry = this.pending.get(msg.id as string | number);
+          if (entry) {
+            clearTimeout(entry.timer);
+            entry.resolve(msg);
+            this.pending.delete(msg.id as string | number);
+          }
         }
       } else {
         this.emit("notification", msg);
@@ -89,6 +93,20 @@ export class McpServerBridge extends EventEmitter {
       this.pending.set(id, { resolve, reject, timer });
       this.process!.stdin!.write(JSON.stringify(jsonRpcMessage) + "\n");
     });
+  }
+
+  respondToServer(id: string | number, result: unknown): void {
+    if (!this.alive || !this.process?.stdin?.writable) return;
+    this.process.stdin.write(
+      JSON.stringify({ jsonrpc: "2.0", id, result }) + "\n"
+    );
+  }
+
+  respondErrorToServer(id: string | number, code: number, message: string): void {
+    if (!this.alive || !this.process?.stdin?.writable) return;
+    this.process.stdin.write(
+      JSON.stringify({ jsonrpc: "2.0", id, error: { code, message } }) + "\n"
+    );
   }
 
   kill(): void {
