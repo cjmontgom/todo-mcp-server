@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import type { GridRow } from "../lib/parseMarkdownTable";
+import type { SamplingEnrichmentDetails } from "../lib/parseSamplingEnrichment";
 
 export type DisplayContent =
   | { type: "idle" }
@@ -7,7 +8,13 @@ export type DisplayContent =
   | { type: "error"; message: string }
   | { type: "grid"; rows: GridRow[]; postAction?: string; key?: string }
   | { type: "text"; text: string; postAction?: string }
-  | { type: "mutated"; text?: string; rows?: GridRow[]; postAction?: string };
+  | {
+      type: "mutated";
+      text?: string;
+      rows?: GridRow[];
+      postAction?: string;
+      sampling?: SamplingEnrichmentDetails;
+    };
 
 interface DisplayState {
   displayContent: DisplayContent;

@@ -792,3 +792,197 @@ So that I understand how MCP servers can request LLM completions from clients an
 **Then** the copy explains the `sampling/createMessage` flow: server sends request → client calls LLM → client returns response → server uses it
 
 ---
+
+## Epic 7: Interactive MCP Sampling — Human-in-the-Loop and Observable Enrichment
+
+Learners move from passively reading about Sampling to actively experiencing it two ways. A new `create_task_using_sampling` tool makes sampling explicit and required — no silent fallbacks, loud failure when sampling is unavailable. In the **"You are the MCP client" tab**, learners answer the server's `sampling/createMessage` request themselves: they see the exact prompt the server sent, type their enrichment response, and submit it — literally acting as the MCP client. In the **"Ollama is the MCP client" tab**, Ollama picks `create_task_using_sampling` automatically when a task is underspecified (e.g. no description provided), and the right-hand panel shows a live step-by-step trace of the entire server→proxy→Ollama→server chain. The static SamplingPanel added in Epic 6 is removed and replaced with contextual education that appears when sampling is engaged. The existing `create_task` tool is reverted to pure task creation with no sampling enrichment.
+
+**FRs covered:** FR35 (dedicated sampling tool, required enrichment), FR36 (human-in-the-loop sampling), FR37 (smart Ollama tool selection for underspecified tasks), FR38 (Ollama sampling trace), FR39 (contextual sampling education)
+**Depends on:** Epic 6 (sampling infrastructure — `server.createMessage`, proxy SSE bridge, enrichment module)
+**Architecture decisions:** Routing is endpoint-based (not header-based) — requests via `/mcp` route to human, requests via `/llm/interpret` route to Ollama. No cross-contamination between routes.
+
+---
+
+### Story 7.1: Revert `create_task` to pure task creation — remove silent sampling enrichment
+
+As a developer and learner using the MCP server,
+I want `create_task` to create tasks exactly as specified without attempting sampling enrichment,
+So that the tool behaves predictably and sampling is only used when explicitly requested via `create_task_using_sampling`.
+
+**Acceptance Criteria:**
+
+**Given** a client calls `create_task` with a title and description
+**When** the server executes the tool
+**Then** the task is created with the exact values provided — no call to `server.createMessage()` is made
+**And** the response text is `Created task {id}: {title}` with no enrichment annotation
+
+**Given** a client calls `create_task` when Ollama is unavailable
+**When** the server executes the tool
+**Then** the task is still created successfully — there is no sampling dependency
+
+**Given** the enrichment module (`src/enrichment.ts`)
+**When** this story is implemented
+**Then** the module is retained (not deleted) because `create_task_using_sampling` in Story 7.2 will use it
+
+---
+
+### Story 7.2: Add `create_task_using_sampling` tool to server — required sampling, loud failure
+
+As a learner using the MCP Tools panel,
+I want a dedicated `create_task_using_sampling` tool that always requires sampling,
+So that I always get a meaningful enrichment result and can see the sampling flow in action.
+
+**Acceptance Criteria:**
+
+**Given** a client that supports sampling calls `create_task_using_sampling` with a title
+**When** the server executes the tool
+**Then** it calls `server.createMessage(...)` with an enrichment prompt
+**And** applies the LLM response to enrich the task fields
+**And** the response text clearly separates original values from enriched values using the same format as Story 6.1: `(enriched by AI — field: "original" → "enriched")`
+
+**Given** a client that does NOT support sampling calls `create_task_using_sampling`
+**When** the server tries to call `server.createMessage(...)`
+**Then** the tool returns `isError: true` with a message explaining sampling capability is required
+**And** no task is created
+
+**Given** sampling is available but times out or the LLM returns unparseable output
+**When** the server handles the error
+**Then** the tool returns `isError: true` with a specific error message (timeout vs bad response)
+**And** no task is created with unenriched data — there is no silent fallback to original values
+
+**Given** the tool listing returned by `tools/list`
+**When** a client reads the tool description
+**Then** the description states this tool requires sampling capability and is intended for the manual "You are the MCP client" learning flow
+
+---
+
+### Story 7.3: Proxy — endpoint-based sampling routing, SSE events, and human response endpoint
+
+As the proxy bridging server and browser,
+I want to route `sampling/createMessage` to either the browser (human mode) or Ollama (AI mode) based on which endpoint triggered the tool call,
+So that the two learning routes are completely independent with no cross-contamination.
+
+**Acceptance Criteria:**
+
+**Given** `create_task_using_sampling` is called via `POST /mcp` (manual tab)
+**When** the server emits `sampling/createMessage`
+**Then** the proxy stores mode = `"human"` and emits SSE event `{ type: "sampling-request", id, messages, maxTokens }` to all connected browser clients
+**And** waits up to 10 minutes for a browser response (generous timeout for learner reading/thinking time)
+**And** does NOT call Ollama
+
+**Given** `create_task_using_sampling` is called via `POST /llm/interpret` (AI tab)
+**When** the server emits `sampling/createMessage`
+**Then** the proxy stores mode = `"ai"` and calls Ollama to fulfil the sampling request
+**And** emits SSE trace events at each step: `{ type: "sampling-trace", step: "server-requested" | "calling-ollama" | "ollama-responded" | "enrichment-applied", data: {...} }`
+**And** does NOT emit a `sampling-request` event to the browser
+
+**Given** the browser POSTs to `POST /mcp/sampling/respond` with `{ id, response: { role, content } }`
+**When** a human-mode sampling request with that id is pending
+**Then** the proxy forwards the browser's response to the server as the sampling result
+**And** the pending `tools/call` resolves with the enriched task
+
+**Given** the browser POSTs to `POST /mcp/sampling/respond` with an unknown or already-resolved id
+**When** the proxy handles the request
+**Then** it returns HTTP 404 or 409 with a clear message
+
+**Given** a human-mode sampling request exceeds the 10-minute cleanup timeout with no browser response
+**When** the proxy timeout fires
+**Then** the proxy sends an error response to the server via `respondErrorToServer`
+**And** no Ollama fallback occurs
+
+---
+
+### Story 7.4: Proxy — update system prompt so Ollama uses sampling tool for underspecified tasks
+
+As a learner using the AI "Ollama is the MCP client" tab,
+I want Ollama to automatically choose `create_task_using_sampling` when I give it a vague or underspecified task request,
+So that I can see the sampling flow triggered naturally by the AI without explicitly asking for it.
+
+**Acceptance Criteria:**
+
+**Given** the system prompt sent to Ollama in `proxy/src/llm.ts`
+**When** this story is implemented
+**Then** the prompt includes explicit tool-selection guidance:
+- Use `create_task` when the user provides a clear title **and** description
+- Use `create_task_using_sampling` when the user's request is vague, missing a description, or would benefit from enrichment (e.g. "add a task: fix the bug", "create a task for the login issue")
+- Never use `create_task_using_sampling` when the user has already provided complete task details
+
+**Given** a learner types "add a task: fix the login bug" in the AI chat
+**When** Ollama interprets the request
+**Then** Ollama selects `create_task_using_sampling` with `{ title: "fix the login bug" }` (no description)
+**And** the proxy routes the resulting sampling request to Ollama (AI mode)
+**And** SSE trace events are emitted
+
+**Given** a learner types "create a task titled 'Update README' with description 'Add setup instructions for Windows users', priority high"
+**When** Ollama interprets the request
+**Then** Ollama selects `create_task` with the full details — no sampling needed
+
+---
+
+### Story 7.5: Client — human-in-the-loop sampling form in the "You are the MCP client" tab
+
+As a learner in the manual tab,
+I want to see the server's `sampling/createMessage` request and answer it myself,
+So that I literally act as the MCP client and understand that sampling puts the LLM decision in my hands.
+
+**Acceptance Criteria:**
+
+**Given** I have called `create_task_using_sampling` from the Tools panel
+**When** the server sends a `sampling/createMessage` request to the proxy
+**Then** the right-hand DetailPanel shows a "Sampling Request" block containing:
+- The full prompt text the server sent
+- An educational note: "The server sent this sampling/createMessage request and is waiting for your LLM response. You are the MCP client."
+- A text area pre-populated with a JSON template for the expected enrichment format
+- A **Submit** button and a **Cancel** button
+
+**Given** I submit a valid enrichment JSON response
+**When** the proxy receives it via `POST /mcp/sampling/respond`
+**Then** the DetailPanel replaces the form with an original-vs-enriched comparison
+**And** shows the educational note: "You answered the server's sampling/createMessage — you acted as the MCP client."
+
+**Given** I click Cancel
+**When** the browser sends a cancel signal
+**Then** the DetailPanel shows: "Sampling cancelled — no task was created. The server received an error response."
+**And** the `tools/call` resolves with `isError: true`
+
+**Given** the server's sampling request expires (10-minute backend timeout) before I respond
+**When** the proxy sends an error to the server
+**Then** the DetailPanel shows a timeout notice: "The sampling request expired. Try calling the tool again."
+
+**Given** the SSE connection receives a `sampling-request` event while I am in the AI tab
+**When** the event arrives
+**Then** the browser ignores it — the human-in-the-loop form only activates from the manual tab
+
+---
+
+### Story 7.6: Client — Ollama sampling trace in AI tab, remove static SamplingPanel, contextual education
+
+As a learner in the AI tab or reading about Sampling,
+I want to see a live trace of the Ollama sampling flow and find educational explanations in context rather than in a static panel,
+So that I understand the exact server→proxy→Ollama→server chain and learn at the moment of engagement.
+
+**Acceptance Criteria:**
+
+**Given** Ollama triggers `create_task_using_sampling` (AI tab)
+**When** sampling completes
+**Then** the right-hand DetailPanel shows a Sampling Trace block with labelled, annotated steps:
+1. Server called `create_task_using_sampling`
+2. Server sent `sampling/createMessage` — _(the server requested an LLM completion from its client)_
+3. Proxy received the request and called Ollama _(model name shown)_
+4. Ollama responded _(raw JSON shown, collapsible)_
+5. Enrichment applied _(changed fields listed: original → enriched)_
+6. Task created: _{enriched title}_
+
+**Given** the Sampling Trace is shown
+**When** the learner reads each step
+**Then** each step includes a one-line educational annotation explaining the protocol action in plain English
+
+**Given** the standalone `SamplingPanel` component currently in the manual tab (added in Story 6.2)
+**When** this story is implemented
+**Then** the `SamplingPanel` is removed from `App.tsx` and the component file is deleted
+**And** `MCP_COPY.samplingBlurb`, `samplingFlow`, `samplingConcept`, `samplingArchitectureNote` remain in `mcpExplainer.ts` for reuse in the contextual UI
+
+**Given** `create_task_using_sampling` is selected in the Tools list (manual tab)
+**When** the tool card is selected but before the form is submitted
+**Then** the right-hand DetailPanel shows a contextual preview explaining the sampling flow that is about to happen, using the existing `MCP_COPY` sampling strings
+**And** this preview replaces the generic "Select a resource, tool, or prompt" placeholder for this specific tool only

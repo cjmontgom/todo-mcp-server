@@ -3,6 +3,7 @@ import { McpProvider } from "./context/McpContext";
 import { DisplayProvider } from "./context/DisplayContext";
 import { ResourcesPanel } from "./components/ResourcesPanel";
 import { ToolsPanel } from "./components/ToolsPanel";
+import { SamplingPanel } from "./components/SamplingPanel";
 import { PromptsPanel } from "./components/PromptsPanel";
 import { ChatPanel, type ChatMessageDisplay } from "./components/ChatPanel";
 import { DetailPanel } from "./components/DetailPanel";
@@ -44,6 +45,7 @@ function App() {
               <>
                 <ResourcesPanel />
                 <ToolsPanel />
+                <SamplingPanel />
                 <PromptsPanel />
               </>
             ) : (

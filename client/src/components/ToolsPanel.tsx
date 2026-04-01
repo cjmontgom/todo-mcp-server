@@ -5,6 +5,7 @@ import { MCP_COPY } from "../copy/mcpExplainer";
 import { callTool } from "../mcp/client";
 import type { Tool, ToolCallResult } from "../mcp/client";
 import { parseMarkdownTable } from "../lib/parseMarkdownTable";
+import { parseSamplingEnrichment } from "../lib/parseSamplingEnrichment";
 
 interface CallState {
   status: "idle" | "loading" | "error";
@@ -158,13 +159,25 @@ export function ToolsPanel() {
       setCallState({ status: "idle" });
 
       const rows = parseMarkdownTable(text);
+      const sampling =
+        selectedTool!.name === "create_task"
+          ? parseSamplingEnrichment(text, {
+              title: typeof args.title === "string" ? args.title : "",
+              description: typeof args.description === "string" ? args.description : "",
+              priority: typeof args.priority === "string" ? args.priority : "",
+              dueDate: typeof args.dueDate === "string" ? args.dueDate : "",
+            })
+          : null;
 
       if (isMutating) {
         setDisplayContent({
           type: "mutated",
           text,
           rows: rows.length > 0 ? rows : undefined,
-          postAction: MCP_COPY.postActionCall(selectedTool!.name),
+          postAction: sampling
+            ? MCP_COPY.postActionSamplingCall(selectedTool!.name)
+            : MCP_COPY.postActionCall(selectedTool!.name),
+          sampling: sampling ?? undefined,
         });
       } else if (rows.length > 0) {
         setDisplayContent({
