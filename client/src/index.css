@@ -662,3 +662,156 @@ code {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ── Sampling Trace ─────────────────────────────── */
+
+.sampling-trace {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.sampling-trace__eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  margin: 0 0 16px;
+}
+
+.sampling-trace__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 16px;
+}
+
+.sampling-trace__step {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 0 12px;
+  position: relative;
+}
+
+.sampling-trace__connector {
+  position: absolute;
+  left: 15px;
+  top: 32px;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+
+.sampling-trace__number {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--btn-fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.sampling-trace__content {
+  padding-bottom: 20px;
+}
+
+.sampling-trace__label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 5px 0 2px;
+}
+
+.sampling-trace__annotation {
+  font-size: 13px;
+  color: var(--text);
+  font-style: italic;
+  margin: 0 0 4px;
+}
+
+.sampling-trace__data {
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+.sampling-trace__model {
+  display: inline-block;
+  background: var(--code-bg);
+  border-radius: 4px;
+  padding: 1px 7px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.sampling-trace__raw-json {
+  margin: 4px 0 0;
+}
+
+.sampling-trace__raw-json summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--accent);
+  user-select: none;
+}
+
+.sampling-trace__raw-pre {
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  background: var(--code-bg);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.sampling-trace__field-list {
+  margin: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sampling-trace__field-change {
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sampling-trace__field-name {
+  font-weight: 700;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--code-bg);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.sampling-trace__field-original {
+  color: var(--text);
+  text-decoration: line-through;
+}
+
+.sampling-trace__field-enriched {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.sampling-trace__task-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--success);
+  margin: 2px 0 0;
+}
+

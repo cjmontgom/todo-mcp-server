@@ -88,5 +88,5 @@ development_status:
   7-3-proxy-endpoint-based-sampling-routing-sse-events-and-human-response-endpoint: done
   7-4-proxy-update-system-prompt-for-smart-ollama-tool-selection: done
   7-5-client-human-in-the-loop-sampling-form-in-manual-tab: done
-  7-6-client-ollama-sampling-trace-remove-static-panel-contextual-education: backlog
+  7-6-client-ollama-sampling-trace-remove-static-panel-contextual-education: done
   epic-7-retrospective: optional

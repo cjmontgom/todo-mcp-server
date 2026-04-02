@@ -38,6 +38,28 @@ interface SamplingOutcomeContent {
   message: string;
 }
 
+export interface SamplingTraceStep {
+  step: "server-requested" | "calling-ollama" | "ollama-responded" | "enrichment-applied";
+  data?: {
+    id?: string | number;
+    messages?: unknown[];
+    maxTokens?: number;
+    model?: string;
+    text?: string;
+    result?: unknown;
+  };
+  timestamp: string;
+}
+
+export interface SamplingTraceContent {
+  type: "sampling-trace";
+  steps: SamplingTraceStep[];
+}
+
+interface SamplingPreviewContent {
+  type: "sampling-preview";
+}
+
 export type DisplayContent =
   | { type: "idle" }
   | { type: "loading"; label: string }
@@ -46,6 +68,8 @@ export type DisplayContent =
   | { type: "text"; text: string; postAction?: string }
   | SamplingPendingContent
   | SamplingOutcomeContent
+  | SamplingTraceContent
+  | SamplingPreviewContent
   | {
       type: "mutated";
       text?: string;
@@ -60,6 +84,8 @@ interface DisplayState {
   setDisplayContent: (content: DisplayContent) => void;
   submitSamplingResponse: (requestId: string | number, text: string) => Promise<void>;
   cancelSamplingResponse: (requestId: string | number) => Promise<void>;
+  isSamplingTraceActive: () => boolean;
+  clearSamplingTrace: () => void;
 }
 
 const DisplayContext = createContext<DisplayState | null>(null);
@@ -102,6 +128,8 @@ export function DisplayProvider({
   const activeTabRef = useRef<ActiveTab>(activeTab);
   const pendingByIdRef = useRef<Map<string, PendingSamplingRequest>>(new Map());
   const activePendingIdRef = useRef<string | null>(null);
+  const samplingTraceActiveRef = useRef(false);
+  const samplingTraceStepsRef = useRef<SamplingTraceStep[]>([]);
 
   useEffect(() => {
     activeTabRef.current = activeTab;
@@ -167,6 +195,21 @@ export function DisplayProvider({
           }
         }
       }
+
+      if (typed.type === "sampling-trace") {
+        if (activeTabRef.current !== "ai") return;
+        const event = payload as { step?: string; data?: Record<string, unknown> };
+        if (!event.step) return;
+        const step = event.step as SamplingTraceStep["step"];
+        const newStep: SamplingTraceStep = {
+          step,
+          data: event.data as SamplingTraceStep["data"],
+          timestamp: new Date().toISOString(),
+        };
+        samplingTraceActiveRef.current = true;
+        samplingTraceStepsRef.current = [...samplingTraceStepsRef.current, newStep];
+        setDisplayContent({ type: "sampling-trace", steps: samplingTraceStepsRef.current });
+      }
     };
 
     return () => {
@@ -194,6 +237,15 @@ export function DisplayProvider({
     if (activePendingIdRef.current === key) {
       activePendingIdRef.current = null;
     }
+  }
+
+  function isSamplingTraceActive(): boolean {
+    return samplingTraceActiveRef.current;
+  }
+
+  function clearSamplingTrace(): void {
+    samplingTraceActiveRef.current = false;
+    samplingTraceStepsRef.current = [];
   }
 
   async function cancelSamplingResponse(requestId: string | number): Promise<void> {
@@ -233,8 +285,10 @@ export function DisplayProvider({
       setDisplayContent,
       submitSamplingResponse,
       cancelSamplingResponse,
+      isSamplingTraceActive,
+      clearSamplingTrace,
     }),
-    [activeTab, displayContent]
+    [activeTab, displayContent] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   return (

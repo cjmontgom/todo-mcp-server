@@ -390,6 +390,13 @@ const httpServer = app.listen(PORT, () => {
   console.log(`  GET  /health                 — Health check`);
 });
 
+// ⚠️  LOCAL DEV ONLY — disable Node's default socket timeout so that long-polling
+// requests (e.g. POST /mcp waiting up to 10 min for a human sampling response)
+// are not dropped by the browser's ~60 s HTTP timeout before the application-level
+// SAMPLING_HUMAN_TIMEOUT_MS fires. Do NOT set this to 0 in a production server —
+// use an explicit, bounded timeout and move long-running work to async jobs instead.
+httpServer.setTimeout(0);
+
 httpServer.on("error", (err: Error) => {
   console.error(`HTTP server error: ${err.message}`);
   process.exit(1);

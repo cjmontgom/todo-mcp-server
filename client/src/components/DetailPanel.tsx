@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useDisplay } from "../context/DisplayContext";
+import { useDisplay, type SamplingTraceStep } from "../context/DisplayContext";
 import { MCP_COPY } from "../copy/mcpExplainer";
+import { parseSamplingEnrichment } from "../lib/parseSamplingEnrichment";
 import { TaskGrid } from "./TaskGrid";
 
 function renderSamplingValue(value: string | undefined) {
@@ -147,6 +148,110 @@ export function DetailPanel() {
     );
   }
 
+  function extractEnrichmentText(step: SamplingTraceStep): string {
+    if (!step.data?.result) return "";
+    const mcpResp = step.data.result as { result?: { content?: Array<{ text?: string }> } };
+    const inner = mcpResp?.result ?? (step.data.result as { content?: Array<{ text?: string }> });
+    return (inner as { content?: Array<{ text?: string }> })?.content?.[0]?.text ?? "";
+  }
+
+  function renderTraceStep(step: SamplingTraceStep, index: number, total: number) {
+    const isLast = index === total - 1;
+
+    const stepConfig: Record<
+      SamplingTraceStep["step"],
+      { label: string; annotation: string }[]
+    > = {
+      "server-requested": [
+        { label: "The AI called create_task_using_sampling", annotation: MCP_COPY.samplingTraceStep1 },
+        { label: "Server sent sampling/createMessage", annotation: MCP_COPY.samplingTraceStep2 },
+      ],
+      "calling-ollama": [
+        { label: `Proxy called LLM${step.data?.model ? ` (${step.data.model})` : ""}`, annotation: MCP_COPY.samplingTraceStep3 },
+      ],
+      "ollama-responded": [
+        { label: "LLM responded", annotation: MCP_COPY.samplingTraceStep4 },
+      ],
+      "enrichment-applied": [
+        { label: "Enrichment applied", annotation: MCP_COPY.samplingTraceStep5 },
+        { label: "Task created", annotation: MCP_COPY.samplingTraceStep6 },
+      ],
+    };
+
+    const uiSteps = stepConfig[step.step] ?? [];
+
+    return uiSteps.map((ui, uiIdx) => {
+      const globalIdx = getStepOffset(step.step) + uiIdx;
+      const stepNum = globalIdx + 1;
+      const isAbsoluteLast = isLast && uiIdx === uiSteps.length - 1;
+
+      return (
+        <div key={`${step.step}-${uiIdx}`} className="sampling-trace__step">
+          {!isAbsoluteLast && <span className="sampling-trace__connector" />}
+          <div className="sampling-trace__number">{stepNum}</div>
+          <div className="sampling-trace__content">
+            <p className="sampling-trace__label">{ui.label}</p>
+            <p className="sampling-trace__annotation">{ui.annotation}</p>
+            {step.step === "calling-ollama" && uiIdx === 0 && step.data?.model && (
+              <p className="sampling-trace__data">
+                Model: <span className="sampling-trace__model">{step.data.model}</span>
+              </p>
+            )}
+            {step.step === "ollama-responded" && uiIdx === 0 && step.data?.text && (
+              <details className="sampling-trace__raw-json">
+                <summary>Show raw response</summary>
+                <pre className="sampling-trace__raw-pre">{step.data.text}</pre>
+              </details>
+            )}
+            {step.step === "enrichment-applied" && uiIdx === 0 && (() => {
+              const text = extractEnrichmentText(step);
+              const enrichment = text
+                ? parseSamplingEnrichment(text, { title: "", description: "", priority: "", dueDate: "" })
+                : null;
+              if (!enrichment) return null;
+              return (
+                <div className="sampling-trace__field-list">
+                  {enrichment.changedFields.map((field) => (
+                    <div key={field} className="sampling-trace__field-change">
+                      <span className="sampling-trace__field-name">{field}</span>
+                      <span className="sampling-trace__field-original">
+                        {enrichment.original[field as keyof typeof enrichment.original] || "(none)"}
+                      </span>
+                      <span>→</span>
+                      <span className="sampling-trace__field-enriched">
+                        {enrichment.enriched[field as keyof typeof enrichment.enriched] || "(none)"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+            {step.step === "enrichment-applied" && uiIdx === 1 && (() => {
+              const text = extractEnrichmentText(step);
+              const enrichment = text
+                ? parseSamplingEnrichment(text, { title: "", description: "", priority: "", dueDate: "" })
+                : null;
+              const title = enrichment?.enriched.title || "(unknown)";
+              return (
+                <p className="sampling-trace__task-title">{title}</p>
+              );
+            })()}
+          </div>
+        </div>
+      );
+    });
+  }
+
+  function getStepOffset(step: SamplingTraceStep["step"]): number {
+    const offsets: Record<SamplingTraceStep["step"], number> = {
+      "server-requested": 0,
+      "calling-ollama": 2,
+      "ollama-responded": 3,
+      "enrichment-applied": 4,
+    };
+    return offsets[step] ?? 0;
+  }
+
   return (
     <div className="detail-panel">
       {displayContent.type === "loading" && (
@@ -222,6 +327,25 @@ export function DetailPanel() {
         <section className="sampling-request">
           <p className="sampling-result__eyebrow">Sampling Request</p>
           <p className="sampling-result__note">{displayContent.message}</p>
+          {renderSamplingEducation()}
+        </section>
+      )}
+
+      {displayContent.type === "sampling-preview" && (
+        <section className="sampling-trace sampling-trace--preview">
+          <p className="sampling-trace__eyebrow">{MCP_COPY.samplingTraceTitle}</p>
+          {renderSamplingEducation()}
+        </section>
+      )}
+
+      {displayContent.type === "sampling-trace" && (
+        <section className="sampling-trace">
+          <p className="sampling-trace__eyebrow">{MCP_COPY.samplingTraceTitle}</p>
+          <div className="sampling-trace__steps">
+            {displayContent.steps.map((step, i) =>
+              renderTraceStep(step, i, displayContent.steps.length)
+            )}
+          </div>
           {renderSamplingEducation()}
         </section>
       )}

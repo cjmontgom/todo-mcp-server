@@ -99,6 +99,9 @@ export function ToolsPanel() {
     setFormValues({});
     setValidationErrors({});
     setCallState({ status: "idle" });
+    if (tool.name === "create_task_using_sampling") {
+      setDisplayContent({ type: "sampling-preview" });
+    }
   }
 
   function handleFieldChange(name: string, value: string) {

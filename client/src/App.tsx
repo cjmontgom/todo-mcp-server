@@ -37,7 +37,7 @@ function App() {
                 className={`tab-button${activeTab === "ai" ? " tab-button--active" : ""}`}
                 onClick={() => setActiveTab("ai")}
               >
-                Ollama is the MCP Client
+                AI is the MCP Client
               </button>
             </div>
             {activeTab === "manual" ? (

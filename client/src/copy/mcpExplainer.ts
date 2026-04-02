@@ -2,7 +2,7 @@ export const MCP_COPY = {
   appSubtitleManual:
     "In this application, you are the LLM (MCP client). Browse Resources, Tools, and Prompts exposed by the MCP server. The available resources, tools and prompts were fetched from the server via the resources/list, tools/list and prompts/list tools. They are dynamic lists dependent on what is made available by the server.",
   appSubtitleAi:
-    "Watch Ollama (the MCP client) interpret your plain-language requests, select the right MCP operation, and execute it — just like agents like Claude do under the hood.",
+    "Watch the AI (MCP client) interpret your plain-language requests, select the right MCP operation, and execute it — just like agents like Claude do under the hood.",
   resourcesBlurb:
     "Resources are read-only data the server exposes by URI. Think of them like a simple GET with no params. You (the client) will have to figure out how to contextualise the raw data you receive. Click a resource to Read it.",
   toolsBlurb:
@@ -16,7 +16,7 @@ export const MCP_COPY = {
     "You answered the server's sampling/createMessage - you acted as the MCP client.",
   samplingTitle: "What is Sampling?",
   samplingExplanation:
-    "Sampling is the forth MCP primitive. During initialise, a sampling-capable client declares capabilities.sampling. Sampling flips the script in that the server sends a request to the client (normally an LLM), then waits for that response before continuing. In this example, the server emits sampling/createMessage; in manual mode, you act as the LLM and provide the response. This has a practical use case of enriching the task creation input with AI-powered data.",
+    "Sampling is the forth MCP primitive. During initialise, a sampling-capable client declares capabilities.sampling. Sampling flips the script in that the server sends a request to the client (normally an LLM), then waits for that response before continuing. In this example, this has a practical use case of enriching the task creation input with AI-powered data if, for example, the user did not provide adequate details.",
   samplingFallbackNote:
     "No sampling enrichment was detected for this create_task call, so the server appears to have used your original values as-is.",
   promptsBlurb:
@@ -40,4 +40,18 @@ export const MCP_COPY = {
   promptNoArgs: "No arguments — invoke directly.",
   ollamaSetupHint:
     "LLM features require Ollama running locally. Install: brew install ollama && ollama pull llama3.1",
+  samplingTraceTitle: "Sampling Trace",
+  samplingTraceStep1:
+    "The AI (MCP client) selected and called create_task_using_sampling — the server will now execute the tool.",
+  samplingTraceStep2:
+    "The server sent a sampling/createMessage request — it delegated the task enrichment back to the AI.",
+  samplingTraceStep3:
+    "The proxy received the sampling request and forwarded it to the LLM — the AI acting as sampling client.",
+  samplingTraceStep4:
+    "The LLM generated a response — raw model output containing the enriched task fields in JSON.",
+  samplingTraceStep5:
+    "The server applied the enrichment — task fields were updated using the AI-generated values.",
+  samplingTraceStep6:
+    "Task created successfully with enriched values — the sampling round-trip is complete.",
+
 } as const;

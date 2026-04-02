@@ -20,7 +20,7 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ messages, onMessagesChange }: ChatPanelProps) {
-  const { setDisplayContent } = useDisplay();
+  const { setDisplayContent, isSamplingTraceActive, clearSamplingTrace } = useDisplay();
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -38,6 +38,7 @@ export function ChatPanel({ messages, onMessagesChange }: ChatPanelProps) {
     onMessagesChange(updated);
     setInputValue("");
     setIsLoading(true);
+    clearSamplingTrace();
 
     const history: ChatMessage[] = updated
       .filter((m) => !m.error)
@@ -115,6 +116,13 @@ export function ChatPanel({ messages, onMessagesChange }: ChatPanelProps) {
       const toolResult = innerResult as { content?: Array<{ text?: string }>; isError?: boolean };
       const text = toolResult?.content?.[0]?.text ?? JSON.stringify(innerResult, null, 2);
 
+      // When create_task_using_sampling is called in AI mode and a sampling trace
+      // is already active (SSE events arrived), let the trace display handle it.
+      // The enrichment-applied SSE event will arrive shortly and show the final step.
+      if (toolName === "create_task_using_sampling" && isSamplingTraceActive()) {
+        return;
+      }
+
       const args = (operation.params.arguments ?? {}) as Record<string, unknown>;
       const isCreateTool = toolName === "create_task" || toolName === "create_task_using_sampling";
       const sampling = isCreateTool
@@ -126,9 +134,7 @@ export function ChatPanel({ messages, onMessagesChange }: ChatPanelProps) {
           })
         : null;
 
-      const postAction = sampling
-        ? MCP_COPY.postActionAiCall(toolName)
-        : MCP_COPY.postActionAiCall(toolName);
+      const postAction = MCP_COPY.postActionAiCall(toolName);
 
       const rows = parseMarkdownTable(text);
       if (rows.length > 0) {
