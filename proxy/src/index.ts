@@ -26,8 +26,25 @@ let internalRequestId = 100000;
 const nextInternalId = () => ++internalRequestId;
 let capabilitiesPromise: Promise<McpCapabilities> | null = null;
 
-bridge.on("notification", (msg: unknown) => {
-  const data = JSON.stringify(msg);
+const SAMPLING_HUMAN_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+
+let currentSamplingMode: "human" | "ai" = "human";
+
+interface PendingSamplingRequest {
+  resolve: (result: Record<string, unknown>) => void;
+  reject: (err: Error) => void;
+  timer: NodeJS.Timeout;
+}
+const pendingSamplingRequests = new Map<string | number, PendingSamplingRequest>();
+
+function broadcastSSE(event: Record<string, unknown>): void {
+  let data: string;
+  try {
+    data = JSON.stringify(event);
+  } catch {
+    console.error("[broadcastSSE] Failed to serialize event");
+    return;
+  }
   for (const client of sseClients) {
     try {
       client.write(`event: message\ndata: ${data}\n\n`);
@@ -35,10 +52,17 @@ bridge.on("notification", (msg: unknown) => {
       sseClients.delete(client);
     }
   }
+}
+
+bridge.on("notification", (msg: unknown) => {
+  broadcastSSE(msg as Record<string, unknown>);
 });
 
 bridge.on("exit", (code: number | null) => {
   console.error(`MCP server exited with code ${code}`);
+  for (const [, p] of pendingSamplingRequests) {
+    p.reject(new Error("MCP server exited"));
+  }
   const errorEvent = JSON.stringify({
     jsonrpc: "2.0",
     method: "notifications/server/exit",
@@ -57,6 +81,9 @@ bridge.on("exit", (code: number | null) => {
 
 bridge.on("error", (err: Error) => {
   console.error("MCP server bridge error:", err.message);
+  for (const [, p] of pendingSamplingRequests) {
+    p.reject(new Error(`MCP server error: ${err.message}`));
+  }
 });
 
 bridge.on("serverRequest", async (msg: Record<string, unknown>) => {
@@ -65,13 +92,59 @@ bridge.on("serverRequest", async (msg: Record<string, unknown>) => {
   const params = msg.params as Record<string, unknown> | undefined;
 
   if (method === "sampling/createMessage") {
-    try {
-      const result = await handleSamplingRequest(params ?? {});
-      bridge.respondToServer(id, result);
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : "Sampling failed";
-      console.error(`[sampling] Error: ${errMsg}`);
-      bridge.respondErrorToServer(id, -32603, errMsg);
+    if (currentSamplingMode === "human") {
+      broadcastSSE({
+        type: "sampling-request",
+        id,
+        messages: params?.messages,
+        maxTokens: params?.maxTokens,
+      });
+
+      const timer = setTimeout(() => {
+        const p = pendingSamplingRequests.get(id);
+        if (p) p.reject(new Error("Sampling request timed out — no human response received within 10 minutes"));
+      }, SAMPLING_HUMAN_TIMEOUT_MS);
+
+      pendingSamplingRequests.set(id, {
+        resolve: (result) => {
+          clearTimeout(timer);
+          pendingSamplingRequests.delete(id);
+          bridge.respondToServer(id, result);
+        },
+        reject: (err) => {
+          clearTimeout(timer);
+          pendingSamplingRequests.delete(id);
+          broadcastSSE({ type: "sampling-request-error", id, error: err.message });
+          bridge.respondErrorToServer(id, -32603, err.message);
+        },
+        timer,
+      });
+    } else {
+      // AI mode: call Ollama + emit trace events
+      broadcastSSE({
+        type: "sampling-trace",
+        step: "server-requested",
+        data: { id, messages: params?.messages, maxTokens: params?.maxTokens },
+      });
+      broadcastSSE({
+        type: "sampling-trace",
+        step: "calling-ollama",
+        data: { model: process.env.LLM_MODEL || "llama3.1" },
+      });
+
+      try {
+        const result = await handleSamplingRequest(params ?? {});
+        broadcastSSE({
+          type: "sampling-trace",
+          step: "ollama-responded",
+          data: { text: (result.content as Record<string, unknown>)?.text ?? "" },
+        });
+        bridge.respondToServer(id, result);
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : "Sampling failed";
+        console.error(`[sampling] Error: ${errMsg}`);
+        bridge.respondErrorToServer(id, -32603, errMsg);
+      }
     }
   } else {
     bridge.respondErrorToServer(id, -32601, `Unsupported server request: ${method}`);
@@ -112,7 +185,8 @@ app.post("/mcp", async (req, res) => {
   }
 
   try {
-    const response = await bridge.send(body);
+    currentSamplingMode = "human";
+    const response = await bridge.send(body, SAMPLING_HUMAN_TIMEOUT_MS + 30_000);
     res.json(response);
   } catch (err: unknown) {
     const message =
@@ -123,6 +197,35 @@ app.post("/mcp", async (req, res) => {
       error: { code: -32603, message },
     });
   }
+});
+
+app.post("/mcp/sampling/respond", (req, res) => {
+  const { id, response } = req.body as {
+    id?: string | number;
+    response?: Record<string, unknown>;
+  };
+
+  if (id == null || !response) {
+    res.status(400).json({ error: "Missing required fields: id, response" });
+    return;
+  }
+
+  if (typeof response !== "object" || !("role" in response) || !("content" in response)) {
+    res.status(400).json({ error: "Response must include 'role' and 'content'" });
+    return;
+  }
+
+  const normalizedId = typeof id === "string" && /^\d+$/.test(id) ? Number(id) : id;
+  const pending = pendingSamplingRequests.get(normalizedId);
+  if (!pending) {
+    res
+      .status(404)
+      .json({ error: `No pending sampling request with id ${id}` });
+    return;
+  }
+
+  pending.resolve(response);
+  res.json({ ok: true });
 });
 
 app.get("/sse", (req, res) => {
@@ -193,6 +296,7 @@ app.post("/llm/interpret", async (req, res) => {
     let mcpResult: unknown;
 
     if (op.type === "resource_read") {
+      currentSamplingMode = "human";
       mcpResult = await bridge.send({
         jsonrpc: "2.0",
         id: nextInternalId(),
@@ -200,13 +304,25 @@ app.post("/llm/interpret", async (req, res) => {
         params: { uri: op.params.uri },
       });
     } else if (op.type === "tool_call") {
+      currentSamplingMode = op.params.name === "create_task_using_sampling" ? "ai" : "human";
       mcpResult = await bridge.send({
         jsonrpc: "2.0",
         id: nextInternalId(),
         method: "tools/call",
         params: { name: op.params.name, arguments: toObj(op.params.arguments) },
       });
+      if (
+        op.params.name === "create_task_using_sampling" &&
+        !(mcpResult as Record<string, unknown>)?.error
+      ) {
+        broadcastSSE({
+          type: "sampling-trace",
+          step: "enrichment-applied",
+          data: { result: mcpResult as Record<string, unknown> },
+        });
+      }
     } else if (op.type === "prompt_get") {
+      currentSamplingMode = "human";
       mcpResult = await bridge.send({
         jsonrpc: "2.0",
         id: nextInternalId(),
@@ -248,10 +364,11 @@ bridge.start(SERVER_PATH);
 
 const httpServer = app.listen(PORT, () => {
   console.log(`MCP proxy listening on http://localhost:${PORT}`);
-  console.log(`  POST /mcp            — JSON-RPC endpoint`);
-  console.log(`  POST /llm/interpret  — LLM interpretation endpoint`);
-  console.log(`  GET  /sse            — Server-Sent Events`);
-  console.log(`  GET  /health         — Health check`);
+  console.log(`  POST /mcp                    — JSON-RPC endpoint (human mode)`);
+  console.log(`  POST /mcp/sampling/respond   — Human-in-the-loop sampling response`);
+  console.log(`  POST /llm/interpret          — LLM interpretation endpoint (AI mode)`);
+  console.log(`  GET  /sse                    — Server-Sent Events`);
+  console.log(`  GET  /health                 — Health check`);
 });
 
 httpServer.on("error", (err: Error) => {

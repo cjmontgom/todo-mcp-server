@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-18
-last_updated: 2026-04-02  # updated: story 7.2 done
+last_updated: 2026-04-02  # updated: story 7.3 done
 project: todo-mcp-server
 project_key: NOKEY
 tracking_system: file-system
@@ -85,7 +85,7 @@ development_status:
   epic-7: in-progress
   7-1-revert-create-task-to-pure-task-creation: done
   7-2-add-create-task-using-sampling-tool-to-server: done
-  7-3-proxy-endpoint-based-sampling-routing-sse-events-and-human-response-endpoint: backlog
+  7-3-proxy-endpoint-based-sampling-routing-sse-events-and-human-response-endpoint: done
   7-4-proxy-update-system-prompt-for-smart-ollama-tool-selection: backlog
   7-5-client-human-in-the-loop-sampling-form-in-manual-tab: backlog
   7-6-client-ollama-sampling-trace-remove-static-panel-contextual-education: backlog
