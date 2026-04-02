@@ -22,7 +22,7 @@ export interface LlmInterpretResponse {
   operation: LlmOperation;
 }
 
-function buildSystemPrompt(capabilities: McpCapabilities): string {
+export function buildSystemPrompt(capabilities: McpCapabilities): string {
   const resourceList = capabilities.resources
     .map((r) => `  - URI: ${r.uri} | Name: ${r.name}${r.description ? ` | ${r.description}` : ""}`)
     .join("\n");
@@ -55,6 +55,12 @@ ${toolList || "  (none)"}
 
 PROMPTS (structured LLM-oriented content, invoked by name with optional arguments):
 ${promptList || "  (none)"}
+
+Task creation — which tool?
+When the user wants to create a todo/task, choose exactly one MCP tool by name:
+- Use create_task when the user provides a clear title and a materially present description — enough detail to create the task without LLM enrichment (both are meaningfully specified).
+- Use create_task_using_sampling when the request is vague, missing a meaningful description, is title-only, or would benefit from enrichment (e.g. "add a task: fix the bug", "create a task for the login issue").
+- Never use create_task_using_sampling when the user already provided complete task details: a clear title, a substantive description, and any other fields they specified; in those cases use create_task only.
 
 Respond ONLY with a JSON object (no markdown fences, no extra text) in this exact format:
 {
