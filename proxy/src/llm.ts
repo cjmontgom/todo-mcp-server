@@ -56,11 +56,20 @@ ${toolList || "  (none)"}
 PROMPTS (structured LLM-oriented content, invoked by name with optional arguments):
 ${promptList || "  (none)"}
 
-Task creation — which tool?
+Task creation — which tool? (CRITICAL — read carefully)
 When the user wants to create a todo/task, choose exactly one MCP tool by name:
-- Use create_task when the user provides a clear title and a materially present description — enough detail to create the task without LLM enrichment (both are meaningfully specified).
-- Use create_task_using_sampling when the request is vague, missing a meaningful description, is title-only, or would benefit from enrichment (e.g. "add a task: fix the bug", "create a task for the login issue").
-- Never use create_task_using_sampling when the user already provided complete task details: a clear title, a substantive description, and any other fields they specified; in those cases use create_task only.
+
+DEFAULT: Use create_task_using_sampling. This is the safer choice and should be your default.
+EXCEPTION: Only use create_task when the user provides BOTH a clear title AND a separate, substantive description (at least one full sentence explaining what the task involves).
+
+A short phrase like "buy food" or "fix the login bug" is a TITLE, not a description. A due date or priority alone does not count as a description.
+
+Examples:
+- "create a task: buy food before April 12th" → create_task_using_sampling (has title + due date, but NO description)
+- "add a task to fix the login bug" → create_task_using_sampling (title only, no description)
+- "create task: deploy v2 — we need to update the CI pipeline, run migrations, and coordinate with the ops team" → create_task (has both a title and a substantive description)
+
+When using create_task_using_sampling, pass whatever the user provided (title, dueDate, priority) as arguments — the sampling step will fill in or improve the rest.
 
 Guardrails for capability and meta questions:
 - If the user asks what tools/resources/prompts/capabilities are available, or asks how to use them, do NOT call any mutation tool. Return operation.type = "none" with a helpful explanation that summarizes the available capability names from this prompt.

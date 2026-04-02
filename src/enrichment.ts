@@ -13,20 +13,34 @@ export interface EnrichmentResult {
   changedFields: string[];
 }
 
+function extractJsonObject(text: string): unknown {
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceMatch) {
+    return JSON.parse(fenceMatch[1].trim());
+  }
+  const braceMatch = text.match(/\{[\s\S]*\}/);
+  if (braceMatch) {
+    return JSON.parse(braceMatch[0]);
+  }
+  return JSON.parse(text.trim());
+}
+
 export function applyEnrichment(
   task: EnrichableTask,
   responseText: string,
 ): EnrichmentResult {
   try {
-    const suggestions = JSON.parse(responseText);
+    const raw = extractJsonObject(responseText);
 
     if (
-      typeof suggestions !== "object" ||
-      suggestions === null ||
-      Array.isArray(suggestions)
+      typeof raw !== "object" ||
+      raw === null ||
+      Array.isArray(raw)
     ) {
       return { enriched: false, changedFields: [] };
     }
+
+    const suggestions = raw as Record<string, unknown>;
 
     const changedFields: string[] = [];
 

@@ -6,6 +6,7 @@ import {
   parseMarkdownTable,
   parseJsonTaskArray,
 } from "../lib/parseMarkdownTable";
+import { parseSamplingEnrichment } from "../lib/parseSamplingEnrichment";
 
 export interface ChatMessageDisplay {
   role: "user" | "assistant";
@@ -111,21 +112,35 @@ export function ChatPanel({ messages, onMessagesChange }: ChatPanelProps) {
       setDisplayContent({ type: "text", text: JSON.stringify(innerResult, null, 2), postAction });
     } else if (operation.type === "tool_call") {
       const toolName = operation.params.name as string;
-      const postAction = MCP_COPY.postActionAiCall(toolName);
       const toolResult = innerResult as { content?: Array<{ text?: string }>; isError?: boolean };
       const text = toolResult?.content?.[0]?.text ?? JSON.stringify(innerResult, null, 2);
 
+      const args = (operation.params.arguments ?? {}) as Record<string, unknown>;
+      const isCreateTool = toolName === "create_task" || toolName === "create_task_using_sampling";
+      const sampling = isCreateTool
+        ? parseSamplingEnrichment(text, {
+            title: typeof args.title === "string" ? args.title : "",
+            description: typeof args.description === "string" ? args.description : "",
+            priority: typeof args.priority === "string" ? args.priority : "",
+            dueDate: typeof args.dueDate === "string" ? args.dueDate : "",
+          })
+        : null;
+
+      const postAction = sampling
+        ? MCP_COPY.postActionAiCall(toolName)
+        : MCP_COPY.postActionAiCall(toolName);
+
       const rows = parseMarkdownTable(text);
       if (rows.length > 0) {
-        setDisplayContent({ type: "mutated", rows, postAction });
+        setDisplayContent({ type: "mutated", rows, postAction, sampling: sampling ?? undefined });
         return;
       }
       const jsonRows = parseJsonTaskArray(text);
       if (jsonRows.length > 0) {
-        setDisplayContent({ type: "mutated", rows: jsonRows, postAction });
+        setDisplayContent({ type: "mutated", rows: jsonRows, postAction, sampling: sampling ?? undefined });
         return;
       }
-      setDisplayContent({ type: "mutated", text, postAction });
+      setDisplayContent({ type: "mutated", text, postAction, sampling: sampling ?? undefined });
     } else if (operation.type === "prompt_get") {
       const promptName = operation.params.name as string;
       const postAction = MCP_COPY.postActionAiInvoke(promptName);

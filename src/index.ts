@@ -400,17 +400,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         dueDate: newTask.dueDate,
       };
 
+      const needsDescription = !original.description.trim();
+
       const enrichmentPrompt =
         `You are enriching a task for a task manager. ` +
-        `Given the task details below, suggest improvements to make it clearer and more actionable. ` +
-        `Return ONLY a JSON object with zero or more of these fields: ` +
-        `title (string), description (string), priority ("low" | "medium" | "high"), dueDate (ISO 8601 string). ` +
-        `Return {} if no changes are warranted.\n\n` +
+        `Given the task details below, return a JSON object that improves the task.\n\n` +
+        `RULES:\n` +
+        `- Return ONLY a raw JSON object — no markdown fences, no explanation, no extra text.\n` +
+        `- The JSON object may contain: title (string), description (string), priority ("low" | "medium" | "high"), dueDate (ISO 8601 string).\n` +
+        (needsDescription
+          ? `- The description is MISSING — you MUST provide a useful, actionable description for this task.\n`
+          : `- Improve the description if it could be clearer or more actionable.\n`) +
+        `- Improve the title if it could be clearer.\n` +
+        `- Set or adjust priority and dueDate if appropriate.\n\n` +
         `Task:\n` +
         `- title: ${original.title}\n` +
-        `- description: ${original.description || "(none provided)"}\n` +
+        `- description: ${original.description || "(empty)"}\n` +
         `- priority: ${original.priority}` +
-        (original.dueDate ? `\n- dueDate: ${original.dueDate}` : "");
+        (original.dueDate ? `\n- dueDate: ${original.dueDate}` : "") +
+        `\n\nRespond with the JSON object only:`;
 
       let samplingResponse: Awaited<ReturnType<typeof server.createMessage>>;
       try {
@@ -453,9 +461,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      console.log("[sampling] Raw enrichment response:", JSON.stringify(contentItem.text));
       const enrichmentResult = applyEnrichment(newTask, contentItem.text);
 
       if (!enrichmentResult.enriched) {
+        console.warn("[sampling] Enrichment failed — no fields changed. Response was:", contentItem.text);
         return {
           content: [{ type: "text", text: "Sampling returned no usable enrichment — task not created" }],
           isError: true,

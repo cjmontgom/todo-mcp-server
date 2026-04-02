@@ -294,6 +294,8 @@ app.post("/llm/interpret", async (req, res) => {
       typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {};
 
     let mcpResult: unknown;
+    let toolName: string | undefined;
+    let toolArgs: Record<string, unknown> | undefined;
 
     if (op.type === "resource_read") {
       currentSamplingMode = "human";
@@ -304,15 +306,28 @@ app.post("/llm/interpret", async (req, res) => {
         params: { uri: op.params.uri },
       });
     } else if (op.type === "tool_call") {
-      currentSamplingMode = op.params.name === "create_task_using_sampling" ? "ai" : "human";
+      toolName = op.params.name as string;
+      toolArgs = toObj(op.params.arguments);
+
+      // Guard: redirect create_task → create_task_using_sampling when
+      // the LLM omitted or left the description empty (the server would
+      // reject it anyway). Sampling will enrich the task instead.
+      if (
+        toolName === "create_task" &&
+        !((toolArgs.description as string) ?? "").trim()
+      ) {
+        toolName = "create_task_using_sampling";
+      }
+
+      currentSamplingMode = toolName === "create_task_using_sampling" ? "ai" : "human";
       mcpResult = await bridge.send({
         jsonrpc: "2.0",
         id: nextInternalId(),
         method: "tools/call",
-        params: { name: op.params.name, arguments: toObj(op.params.arguments) },
+        params: { name: toolName, arguments: toolArgs },
       });
       if (
-        op.params.name === "create_task_using_sampling" &&
+        toolName === "create_task_using_sampling" &&
         !(mcpResult as Record<string, unknown>)?.error
       ) {
         broadcastSSE({
@@ -343,9 +358,13 @@ app.post("/llm/interpret", async (req, res) => {
       );
     }
 
+    const finalOperation = op.type === "tool_call" && toolName
+      ? { ...intent.operation, params: { ...op.params, name: toolName, arguments: toolArgs } }
+      : intent.operation;
+
     res.json({
       explanation: intent.explanation,
-      operation: intent.operation,
+      operation: finalOperation,
       mcpResult,
     });
   } catch (err: unknown) {
