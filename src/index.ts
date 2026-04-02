@@ -9,7 +9,9 @@ import {
   GetPromptRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
-import { VALID_PRIORITIES } from "./enrichment.js";
+import { applyEnrichment, VALID_PRIORITIES } from "./enrichment.js";
+
+const SAMPLING_TOOL_TIMEOUT_MS = 15_000;
 
 interface Task {
   id: string;
@@ -306,6 +308,31 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["id"],
         },
       },
+      {
+        name: "create_task_using_sampling",
+        description:
+          "Create a new task with AI-powered enrichment via MCP sampling. Requires the client to support the sampling capability. Intended for the 'You are the MCP client' manual learning flow.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            title: { type: "string", description: "Task title (required)" },
+            description: {
+              type: "string",
+              description: "Optional starting description — the LLM will improve or create it",
+            },
+            priority: {
+              type: "string",
+              enum: ["low", "medium", "high"],
+              description: "Optional starting priority — the LLM may adjust it",
+            },
+            dueDate: {
+              type: "string",
+              description: "Optional due date (ISO 8601, e.g. 2026-04-01) — the LLM may suggest one",
+            },
+          },
+          required: ["title"],
+        },
+      },
     ],
   };
 });
@@ -343,6 +370,114 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       return {
         content: [{ type: "text", text: `Created task ${id}: ${newTask.title}` }],
+      };
+    }
+
+    case "create_task_using_sampling": {
+      if (!(args.title as string)?.trim()) {
+        return {
+          content: [{ type: "text", text: "Title cannot be empty" }],
+          isError: true,
+        };
+      }
+
+      const id = String(tasks.size + 1);
+      const newTask: Task = {
+        id,
+        title: args.title as string,
+        description: (args.description as string) || "",
+        status: "todo",
+        priority: (args.priority as Task["priority"]) || "medium",
+        createdAt: new Date().toISOString(),
+        dueDate: args.dueDate ? (args.dueDate as string) : undefined,
+      };
+
+      const original = {
+        title: newTask.title,
+        description: newTask.description,
+        priority: newTask.priority,
+        dueDate: newTask.dueDate,
+      };
+
+      const enrichmentPrompt =
+        `You are enriching a task for a task manager. ` +
+        `Given the task details below, suggest improvements to make it clearer and more actionable. ` +
+        `Return ONLY a JSON object with zero or more of these fields: ` +
+        `title (string), description (string), priority ("low" | "medium" | "high"), dueDate (ISO 8601 string). ` +
+        `Return {} if no changes are warranted.\n\n` +
+        `Task:\n` +
+        `- title: ${original.title}\n` +
+        `- description: ${original.description || "(none provided)"}\n` +
+        `- priority: ${original.priority}` +
+        (original.dueDate ? `\n- dueDate: ${original.dueDate}` : "");
+
+      let samplingResponse: Awaited<ReturnType<typeof server.createMessage>>;
+      try {
+        samplingResponse = await Promise.race([
+          server.createMessage({
+            messages: [{ role: "user", content: { type: "text", text: enrichmentPrompt } }],
+            maxTokens: 300,
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("Sampling timed out")),
+              SAMPLING_TOOL_TIMEOUT_MS
+            )
+          ),
+        ]);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Sampling failed";
+        const isSamplingTimeout = msg === "Sampling timed out";
+        return {
+          content: [
+            {
+              type: "text",
+              text: isSamplingTimeout
+                ? "Sampling timed out — task not created"
+                : `create_task_using_sampling requires sampling capability. The client reported: ${msg}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const contentItem = Array.isArray(samplingResponse.content)
+        ? samplingResponse.content[0]
+        : samplingResponse.content;
+
+      if (!contentItem || contentItem.type !== "text") {
+        return {
+          content: [{ type: "text", text: "Sampling returned a non-text response — task not created" }],
+          isError: true,
+        };
+      }
+
+      const enrichmentResult = applyEnrichment(newTask, contentItem.text);
+
+      if (!enrichmentResult.enriched) {
+        return {
+          content: [{ type: "text", text: "Sampling returned no usable enrichment — task not created" }],
+          isError: true,
+        };
+      }
+
+      tasks.set(id, newTask);
+
+      const changes = enrichmentResult.changedFields
+        .map((f) => {
+          const origVal = original[f as keyof typeof original] ?? "";
+          const newVal = (newTask as unknown as Record<string, string>)[f] ?? "";
+          return `${f}: "${origVal}" → "${newVal}"`;
+        })
+        .join(", ");
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Created task ${id}: ${newTask.title} (enriched by AI — ${changes})`,
+          },
+        ],
       };
     }
 
