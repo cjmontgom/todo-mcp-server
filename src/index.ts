@@ -9,7 +9,7 @@ import {
   GetPromptRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
-import { applyEnrichment, VALID_PRIORITIES } from "./enrichment.js";
+import { VALID_PRIORITIES } from "./enrichment.js";
 
 interface Task {
   id: string;
@@ -24,7 +24,6 @@ interface Task {
 
 const VALID_STATUSES: Task["status"][] = ["todo", "in-progress", "done"];
 
-const ENRICHMENT_TIMEOUT_MS = 15_000;
 const PRIORITY_RANK: Record<Task["priority"], number> = { high: 0, medium: 1, low: 2 };
 
 function escMdCell(s: string): string {
@@ -340,70 +339,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         dueDate: args.dueDate ? (args.dueDate as string) : undefined,
       };
 
-      const original = {
-        title: newTask.title,
-        description: newTask.description,
-        priority: newTask.priority,
-        dueDate: newTask.dueDate,
-      };
-
-      let enrichmentResult = { enriched: false, changedFields: [] as string[] };
-      try {
-        const enrichmentPrompt = `You are enriching a task for a todo app. The user provided:
-- Title: "${newTask.title}"
-- Description: "${newTask.description || "(none)"}"
-- Priority: "${newTask.priority || "(none)"}"
-- Due date: "${newTask.dueDate || "(none)"}"
-
-Return a JSON object with improved values. Only include fields you want to change:
-{
-  "title": "clearer, more actionable title",
-  "description": "helpful description if missing or vague",
-  "priority": "low" | "medium" | "high",
-  "dueDate": "ISO 8601 date if you can estimate one, or omit"
-}
-
-Respond with ONLY the JSON object, no explanation.`;
-
-        const response = await Promise.race([
-          server.createMessage({
-            messages: [
-              {
-                role: "user",
-                content: { type: "text", text: enrichmentPrompt },
-              },
-            ],
-            maxTokens: 300,
-          }),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("Enrichment timed out")), ENRICHMENT_TIMEOUT_MS)
-          ),
-        ]);
-
-        if (response.content.type === "text") {
-          enrichmentResult = applyEnrichment(newTask, response.content.text);
-        }
-      } catch (err) {
-        console.error(
-          "Sampling enrichment skipped:",
-          err instanceof Error ? err.message : err
-        );
-      }
-
       tasks.set(id, newTask);
 
-      let responseText = `Created task ${id}: ${newTask.title}`;
-      if (enrichmentResult.enriched) {
-        const changes = enrichmentResult.changedFields
-          .map((f) => {
-            const key = f as keyof typeof original;
-            return `${f}: "${original[key] ?? "(none)"}" → "${newTask[key as keyof Task] ?? "(none)"}"`;
-          })
-          .join(", ");
-        responseText += ` (enriched by AI — ${changes})`;
-      }
       return {
-        content: [{ type: "text", text: responseText }],
+        content: [{ type: "text", text: `Created task ${id}: ${newTask.title}` }],
       };
     }
 

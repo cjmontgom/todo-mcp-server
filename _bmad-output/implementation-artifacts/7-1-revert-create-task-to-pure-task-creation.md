@@ -1,6 +1,6 @@
 # Story 7.1: Revert `create_task` to Pure Task Creation
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -45,23 +45,23 @@ So that the tool behaves predictably and sampling is only used when explicitly r
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Remove sampling enrichment from `create_task` in `src/index.ts` (AC: #1, #2, #3)
-  - [ ] 1.1 In the `create_task` case of the `CallToolRequestSchema` handler, remove the `enrichmentPrompt` string
-  - [ ] 1.2 Remove the `original` snapshot object (`title`, `description`, `priority`, `dueDate` captured before enrichment)
-  - [ ] 1.3 Remove the `enrichmentResult` variable and the `Promise.race([server.createMessage(...), timeout])` block including its try/catch
-  - [ ] 1.4 Remove the `ENRICHMENT_TIMEOUT_MS` constant (top of file) if it is no longer referenced elsewhere — check first
-  - [ ] 1.5 Simplify the response text to `Created task ${id}: ${newTask.title}` with no conditional enrichment annotation
-  - [ ] 1.6 Ensure the `applyEnrichment` import from `./enrichment.js` is removed from `src/index.ts` if it is now unused — but leave `enrichment.ts` itself intact
+- [x] Task 1: Remove sampling enrichment from `create_task` in `src/index.ts` (AC: #1, #2, #3)
+  - [x] 1.1 In the `create_task` case of the `CallToolRequestSchema` handler, remove the `enrichmentPrompt` string
+  - [x] 1.2 Remove the `original` snapshot object (`title`, `description`, `priority`, `dueDate` captured before enrichment)
+  - [x] 1.3 Remove the `enrichmentResult` variable and the `Promise.race([server.createMessage(...), timeout])` block including its try/catch
+  - [x] 1.4 Remove the `ENRICHMENT_TIMEOUT_MS` constant (top of file) if it is no longer referenced elsewhere — check first
+  - [x] 1.5 Simplify the response text to `Created task ${id}: ${newTask.title}` with no conditional enrichment annotation
+  - [x] 1.6 Ensure the `applyEnrichment` import from `./enrichment.js` is removed from `src/index.ts` if it is now unused — but leave `enrichment.ts` itself intact
 
-- [ ] Task 2: Verify `src/enrichment.ts` and tests are untouched (AC: #4)
-  - [ ] 2.1 Confirm `src/enrichment.ts` is unchanged
-  - [ ] 2.2 Run `npm test` — all enrichment tests in `src/enrichment.test.ts` still pass
+- [x] Task 2: Verify `src/enrichment.ts` and tests are untouched (AC: #4)
+  - [x] 2.1 Confirm `src/enrichment.ts` is unchanged
+  - [x] 2.2 Run `npm test` — all enrichment tests in `src/enrichment.test.ts` still pass
 
-- [ ] Task 3: Build and regression check (AC: #5, #6)
-  - [ ] 3.1 `npm run build` — zero TypeScript errors
-  - [ ] 3.2 `npm test` — all existing tests pass (enrichment tests, proxy bridge tests, sampling handler tests)
-  - [ ] 3.3 Manually verify: start proxy + server, call `create_task` via curl or the UI — response is plain `Created task N: {title}` with no enrichment text
-  - [ ] 3.4 Manually verify: call `update_task`, `get_task`, `delete_task`, `update_task_status` — all behave identically to before
+- [x] Task 3: Build and regression check (AC: #5, #6)
+  - [x] 3.1 `npm run build` — zero TypeScript errors
+  - [x] 3.2 `npm test` — all existing tests pass (enrichment tests, proxy bridge tests, sampling handler tests)
+  - [x] 3.3 Manually verify: start proxy + server, call `create_task` via curl or the UI — response is plain `Created task N: {title}` with no enrichment text
+  - [x] 3.4 Manually verify: call `update_task`, `get_task`, `delete_task`, `update_task_status` — all behave identically to before
 
 ## Dev Notes
 
@@ -191,20 +191,26 @@ Recent commits show all feature work uses `feat(X.Y): description` format. This 
 
 ### Agent Model Used
 
-_to be filled_
+claude-4.6-sonnet-medium-thinking (2026-04-02)
 
 ### Debug Log References
 
-_to be filled_
+No issues encountered. Surgical removal was straightforward.
 
 ### Completion Notes List
 
-_to be filled_
+- Removed `applyEnrichment` from import (kept `VALID_PRIORITIES` — still used by `update_task`)
+- Removed `ENRICHMENT_TIMEOUT_MS = 15_000` constant (was only referenced in the enrichment block)
+- Removed `original` snapshot, `enrichmentResult` variable, `enrichmentPrompt` string, and `Promise.race([server.createMessage(...), timeout])` try/catch block from `create_task`
+- Simplified response to `Created task ${id}: ${newTask.title}` with no conditional annotation
+- `src/enrichment.ts` and `src/enrichment.test.ts` left completely untouched
+- `npm run build` — zero TypeScript errors ✅
+- `npm test` — 12/12 tests pass ✅ (all enrichment tests pass)
 
 ### File List
 
-_to be filled_
+- `src/index.ts` (modified)
 
 ### Change Log
 
-_to be filled_
+- 2026-04-02: Removed sampling enrichment from `create_task`; simplified response text; removed `ENRICHMENT_TIMEOUT_MS` constant and `applyEnrichment` import. `enrichment.ts` and all tests untouched.
