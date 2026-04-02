@@ -7,21 +7,16 @@ export const MCP_COPY = {
     "Resources are read-only data the server exposes by URI. Think of them like a simple GET with no params. You (the client) will have to figure out how to contextualise the raw data you receive. Click a resource to Read it.",
   toolsBlurb:
     "Tools are actions the client can invoke with arguments. They provide all the CRUD operations. They are the only way to mutate the server state, or read using a parameterised query. Again, what is returned is up to you to contextualise. Fill the form and Call a tool.",
-  samplingBlurb:
-    "Sampling is the fourth MCP primitive: a server can ask its client for an LLM completion. In this project the proxy advertises sampling capability, receives the server's sampling/createMessage request, calls Ollama, and returns the model output so the server can enrich your task.",
-  samplingConcept:
-    "Resources, Tools, and Prompts remain separate MCP primitives. Sampling is different because the request direction flips: the server initiates it and waits for the client to answer.",
-  samplingFlow: [
-    "1. During initialize, a sampling-capable client declares capabilities.sampling.",
-    "2. The server later sends sampling/createMessage with messages and token limits.",
-    "3. The client handles the LLM call and returns the model response.",
-    "4. The server uses that response to continue its own tool logic, such as enriching create_task input.",
-  ],
-  samplingArchitectureNote:
-    "This demo teaches the canonical server-to-client Sampling flow, but the browser UI is not directly answering sampling/createMessage today. The proxy is acting as the MCP client from the server's perspective and is the layer that calls Ollama.",
   samplingResultTitle: "Sampling enrichment detected",
   samplingResultNote:
-    "The server used Sampling to request an LLM completion before finishing create_task. Compare your original input with the enriched values below.",
+    "The server used Sampling to request the help of the LLM before finishing create_task. Compare your original input with the enriched values below.",
+  samplingManualRequestNote:
+    "The server sent this sampling/createMessage request and is waiting for your response. You are the MCP client.",
+  samplingManualAnsweredNote:
+    "You answered the server's sampling/createMessage - you acted as the MCP client.",
+  samplingTitle: "What is Sampling?",
+  samplingExplanation:
+    "Sampling is the forth MCP primitive. During initialise, a sampling-capable client declares capabilities.sampling. Sampling flips the script in that the server sends a request to the client (normally an LLM), then waits for that response before continuing. In this example, the server emits sampling/createMessage; in manual mode, you act as the LLM and provide the response. This has a practical use case of enriching the task creation input with AI-powered data.",
   samplingFallbackNote:
     "No sampling enrichment was detected for this create_task call, so the server appears to have used your original values as-is.",
   promptsBlurb:

@@ -81,7 +81,7 @@ function renderField(
   );
 }
 
-const MUTATING_TOOLS = new Set(["create_task", "update_task"]);
+const MUTATING_TOOLS = new Set(["create_task", "create_task_using_sampling", "update_task"]);
 
 export function ToolsPanel() {
   const { tools } = useMcp();
@@ -151,8 +151,38 @@ export function ToolsPanel() {
         .join("\n");
 
       if (result.isError) {
-        setCallState({ status: "error", error: text || "Tool returned an error." });
-        setDisplayContent({ type: "error", message: text || "Tool returned an error." });
+        const message = text || "Tool returned an error.";
+
+        if (selectedTool!.name === "create_task_using_sampling") {
+          if (message.toLowerCase().includes("timed out")) {
+            setCallState({ status: "idle" });
+            setDisplayContent({
+              type: "sampling-outcome",
+              outcome: "timeout",
+              message: "The sampling request expired. Try calling the tool again.",
+            });
+            return;
+          }
+
+          if (
+            message.toLowerCase().includes("non-text response") ||
+            message.toLowerCase().includes("no usable enrichment") ||
+            message.toLowerCase().includes("invalid_union") ||
+            message.toLowerCase().includes("no matching discriminator")
+          ) {
+            setCallState({ status: "idle" });
+            setDisplayContent({
+              type: "sampling-outcome",
+              outcome: "cancelled",
+              message:
+                "Sampling cancelled - no task was created. The server received an error response.",
+            });
+            return;
+          }
+        }
+
+        setCallState({ status: "error", error: message });
+        setDisplayContent({ type: "error", message });
         return;
       }
 
@@ -160,7 +190,8 @@ export function ToolsPanel() {
 
       const rows = parseMarkdownTable(text);
       const sampling =
-        selectedTool!.name === "create_task"
+        selectedTool!.name === "create_task" ||
+        selectedTool!.name === "create_task_using_sampling"
           ? parseSamplingEnrichment(text, {
               title: typeof args.title === "string" ? args.title : "",
               description: typeof args.description === "string" ? args.description : "",

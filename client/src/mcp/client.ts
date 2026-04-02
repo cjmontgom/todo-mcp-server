@@ -145,6 +145,54 @@ export async function callTool(
   return { content: typed.content, isError: typed.isError };
 }
 
+export interface SamplingResponseMessage {
+  role: "assistant";
+  model: string;
+  content: {
+    type: "text" | string;
+    text?: string;
+  };
+}
+
+export async function respondToSamplingRequest(payload: {
+  id: string | number;
+  response: SamplingResponseMessage;
+}): Promise<{ ok: true }> {
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}/mcp/sampling/respond`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new Error(`Proxy unreachable at ${BASE_URL}. Is it running?`);
+  }
+
+  let data: { ok?: boolean; error?: string } | undefined;
+  try {
+    data = (await response.json()) as { ok?: boolean; error?: string };
+  } catch {
+    throw new Error(`Proxy returned non-JSON response (HTTP ${response.status})`);
+  }
+
+  if (!response.ok) {
+    if (response.status === 400) {
+      throw new Error(data?.error ?? "Sampling response payload was invalid.");
+    }
+    if (response.status === 404) {
+      throw new Error(data?.error ?? "Sampling request not found or already resolved.");
+    }
+    throw new Error(data?.error ?? `Proxy returned HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  if (!data?.ok) {
+    throw new Error("Sampling response endpoint returned an unexpected payload.");
+  }
+
+  return { ok: true };
+}
+
 export interface PromptMessage {
   role: string;
   content: { type: string; text?: string };

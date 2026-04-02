@@ -376,34 +376,6 @@ code {
   background: var(--error-bg);
 }
 
-.sampling-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  font-size: 14px;
-}
-
-.sampling-copy p,
-.sampling-copy ol {
-  margin: 0;
-}
-
-.sampling-flow {
-  padding-left: 20px;
-  color: var(--text-h);
-}
-
-.sampling-flow li + li {
-  margin-top: 6px;
-}
-
-.sampling-architecture-note {
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--accent-light);
-}
-
 /* Chat panel (Story 5.1) */
 
 .chat-panel {
@@ -558,6 +530,87 @@ code {
   margin: 0;
   font-size: 14px;
   color: var(--text-h);
+}
+
+.sampling-request {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sampling-request__prompt {
+  margin-top: 0;
+}
+
+.sampling-request__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.sampling-request__textarea {
+  width: 100%;
+  min-height: 180px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-h);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.sampling-request__textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.sampling-request__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sampling-cancel-btn {
+  align-self: flex-start;
+  padding: 8px 20px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-h);
+}
+
+.sampling-cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sampling-education {
+  display: grid;
+  gap: 10px;
+}
+
+.sampling-education-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--accent-light);
+}
+
+.sampling-education-section h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.sampling-education-section p {
+  margin: 0;
+  font-size: 14px;
 }
 
 .sampling-comparison-grid {

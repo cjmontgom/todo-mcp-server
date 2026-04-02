@@ -1,6 +1,7 @@
 export interface GridRow {
   id: string;
   title: string;
+  description: string;
   priority: string;
   due: string;
   status: string;
@@ -9,8 +10,11 @@ export interface GridRow {
 const HEADER_MAP: Record<string, keyof GridRow> = {
   id: 'id',
   title: 'title',
+  description: 'description',
+  desc: 'description',
   priority: 'priority',
   due: 'due',
+  duedate: 'due',
   status: 'status',
 };
 
@@ -31,18 +35,24 @@ export function parseMarkdownTable(text: string): GridRow[] {
       const field = HEADER_MAP[h];
       if (field) row[field] = cells[i] ?? '';
     });
-    return { id: '', title: '', priority: '', due: '', status: '', ...row };
+    return { id: '', title: '', description: '', priority: '', due: '', status: '', ...row };
   });
 }
 
 export function parseJsonTaskArray(text: string): GridRow[] {
   try {
     const tasks = JSON.parse(text) as Array<{
-      id: string; title: string; priority: string; status: string; dueDate?: string | null;
+      id: string;
+      title: string;
+      description?: string;
+      priority: string;
+      status: string;
+      dueDate?: string | null;
     }>;
     return tasks.map(t => ({
       id: t.id ?? '',
       title: t.title ?? '',
+      description: t.description ?? '',
       priority: t.priority ?? '',
       due: t.dueDate ?? '',
       status: t.status ?? '',

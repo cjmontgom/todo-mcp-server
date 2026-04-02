@@ -11,7 +11,8 @@ import {
 
 import { applyEnrichment, VALID_PRIORITIES } from "./enrichment.js";
 
-const SAMPLING_TOOL_TIMEOUT_MS = 15_000;
+// Keep this aligned with proxy human-in-the-loop sampling window.
+const SAMPLING_TOOL_TIMEOUT_MS = 10 * 60 * 1000;
 
 interface Task {
   id: string;
@@ -33,11 +34,11 @@ function escMdCell(s: string): string {
 }
 
 function markdownTable(tasks: Task[]): string {
-  const header = "| ID | Title | Priority | Due | Status |";
-  const separator = "| --- | --- | --- | --- | --- |";
+  const header = "| ID | Title | Description | Priority | Due | Status |";
+  const separator = "| --- | --- | --- | --- | --- | --- |";
   const lines = tasks.map(
     (t) =>
-      `| ${escMdCell(t.id)} | ${escMdCell(t.title)} | ${escMdCell(t.priority)} | ${escMdCell(t.dueDate ?? "")} | ${escMdCell(t.status)} |`
+      `| ${escMdCell(t.id)} | ${escMdCell(t.title)} | ${escMdCell(t.description)} | ${escMdCell(t.priority)} | ${escMdCell(t.dueDate ?? "")} | ${escMdCell(t.status)} |`
   );
   return [header, separator, ...lines].join("\n");
 }
@@ -311,7 +312,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "create_task_using_sampling",
         description:
-          "Create a new task with AI-powered enrichment via MCP sampling. Requires the client to support the sampling capability. Intended for the 'You are the MCP client' manual learning flow.",
+          "Create a new task with AI-powered enrichment via MCP sampling. Requires the client to support the sampling capability.",
         inputSchema: {
           type: "object",
           properties: {

@@ -42,6 +42,14 @@ Then start all three processes in parallel:
 npm run dev
 ```
 
+If you already have stale local processes from an earlier run, use:
+
+```bash
+npm run dev:clean
+```
+
+This kills anything currently bound to ports `3001` (proxy) and `5173` (client), then starts everything.
+
 This runs:
 | Process | URL | Description |
 |---------|-----|-------------|
